@@ -62,7 +62,8 @@ public interface SecurityFramework extends Library {
     OSStatus SecCertificateCopyCommonName(@NotNull SecCertificateRef certificate, @NotNull CFStringRefByReference commonName);
 
     /**
-     * Returns the unique identifier of the opaque type to which a certificate object belongs.
+     * @return
+     *      The unique identifier of the opaque type to which a certificate object belongs.
      *
      * @see <a href="https://developer.apple.com/documentation/security/1396056-seccertificategettypeid">developer.apple.com</a>
      */

@@ -69,7 +69,33 @@ public interface Crypt32Ext extends StdCallLibrary {
     Crypt32Ext INSTANCE = Native.load("Crypt32", Crypt32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
-     * <a href="https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore">https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore</a>
+     * The {@code CertOpenStore} function opens a certificate store by using a specified store provider type
+     *
+     * @param lpszStoreProvider
+     *          A pointer to a null-terminated ANSI string that contains the store provider type.
+     * @param dwEncodingType
+     *          Specifies the <a href="https://docs.microsoft.com/en-us/windows/desktop/SecGloss/c-gly">certificate encoding type</a>
+     *          and <a href="https://docs.microsoft.com/en-us/windows/desktop/SecGloss/m-gly">message encoding</a> type.
+     *          Encoding is used only when the {@code dwSaveAs} parameter of the
+     *          <a href="https://docs.microsoft.com/en-us/windows/desktop/api/wincrypt/nf-wincrypt-certsavestore">CertSaveStore</a>
+     *          function contains {@code CERT_STORE_SAVE_AS_PKCS7}.
+     *          Otherwise, the {@code dwMsgAndCertEncodingType} parameter is not used.
+     * @param hCryptProv
+     *          This parameter is not used and should be set to NULL.
+     * @param dwFlags
+     *          These values consist of high-word and low-word values combined by using a bitwise-OR operation.
+     *          See {@code CERT_STORE_*_FLAG} and {@code CERT_SYSTEM_STORE_*} constants.
+     * @param pvPara
+     *          A 32-bit value that can contain additional information for this function. The contents of
+     *          this parameter depends on the value of the {@code lpszStoreProvider} and other parameters.
+     * @return
+     *          If the function succeeds, the function returns a handle to the certificate store.
+     *          When you have finished using the store, release the handle by calling the
+     *          {@link com.sun.jna.platform.win32.Crypt32#CertCloseStore(WinCrypt.HCERTSTORE, int)} function.
+     *          If the function fails, it returns NULL. For extended error information,
+     *          call {@link Native#getLastError()}.
+     *
+     * @see <a href="https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore">MSDN</a>
      */
     WinCrypt.HCERTSTORE CertOpenStore(
             WTypes.LPSTR lpszStoreProvider,
