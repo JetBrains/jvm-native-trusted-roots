@@ -14,6 +14,10 @@ import java.util.List;
 import java.util.function.Predicate;
 
 public class SecurityFrameworkUtil {
+    public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) throws CertificateException {
+        return SecTrustSettingsCopyCertificates(domain, cert -> isTrustedRoot(domain, cert));
+    }
+
     @NotNull
     public static List<X509Certificate> SecTrustSettingsCopyCertificates(
             @NotNull SecurityFramework.SecTrustSettingsDomain domain,
