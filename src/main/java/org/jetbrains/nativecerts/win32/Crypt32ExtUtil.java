@@ -8,32 +8,53 @@ import java.io.ByteArrayInputStream;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.sun.jna.platform.win32.WinError.*;
 
 public class Crypt32ExtUtil {
+    private final static Logger LOGGER = Logger.getLogger(Crypt32ExtUtil.class.getName());
+
+    private static final Map<String, Integer> customTrustedCertificatesLocations = Map.of(
+            "CERT_SYSTEM_STORE_LOCAL_MACHINE", Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE,
+            "CERT_SYSTEM_STORE_LOCAL_MACHINE_GROUP_POLICY", Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE_GROUP_POLICY,
+            "CERT_SYSTEM_STORE_LOCAL_MACHINE_ENTERPRISE", Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE_ENTERPRISE,
+            "CERT_SYSTEM_STORE_CURRENT_USER", Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER,
+            "CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY", Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY
+    );
+
+    public static Collection<X509Certificate> getCustomTrustedRootCertificates() throws CertificateException {
+        HashSet<X509Certificate> result = new HashSet<>();
+
+        for (Map.Entry<String, Integer> entry : customTrustedCertificatesLocations.entrySet()) {
+            List<X509Certificate> list = gatherEnterpriseCertsForLocation(entry.getValue(), "ROOT");
+
+            if (LOGGER.isLoggable(Level.FINE)) {
+                StringBuilder message = new StringBuilder();
+                message.append("Received ").append(list.size()).append(" certificates from store ROOT / ").append(entry.getKey());
+
+                for (X509Certificate certificate : list) {
+                    message.append("\n  ROOT/").append(entry.getKey()).append(": ").append(certificate.getSubjectDN());
+                }
+
+                LOGGER.fine(message.toString());
+            }
+
+            result.addAll(list);
+        }
+
+        return result;
+    }
+
     public static void CertCloseStore(WinCrypt.HCERTSTORE handle) {
         if (!Crypt32.INSTANCE.CertCloseStore(handle, 0)) {
             throw new IllegalStateException("CertCloseStore: " + Kernel32Util.formatMessage(Native.getLastError()));
         }
-
-        {
-            int a = 4;
-        }
     }
 
-    public static List<X509Certificate> GatherEnterpriseCertsForLocation(int location, String store_name) throws CertificateException {
-        if (!(location == Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE ||
-                location == Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE_GROUP_POLICY ||
-                location == Crypt32Ext.CERT_SYSTEM_STORE_LOCAL_MACHINE_ENTERPRISE ||
-                location == Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER ||
-                location == Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY)) {
-            return Collections.emptyList();
-        }
-
+    public static List<X509Certificate> gatherEnterpriseCertsForLocation(int location, String store_name) throws CertificateException {
         int flags = location | Crypt32Ext.CERT_STORE_OPEN_EXISTING_FLAG | Crypt32Ext.CERT_STORE_READONLY_FLAG;
 
         WinCrypt.HCERTSTORE hcertstore =
@@ -42,11 +63,11 @@ public class Crypt32ExtUtil {
                         0,
                         new WinCrypt.HCRYPTPROV_LEGACY(0),
                         flags,
-                        new WTypes.LPWSTR(store_name).getPointer());
+                        new WTypes.LPWSTR(store_name));
         if (hcertstore == null) {
             int errorCode = Native.getLastError();
 
-            if (errorCode == ERROR_NO_MORE_FILES) {
+            if (errorCode == ERROR_NO_MORE_FILES || errorCode == ERROR_FILE_NOT_FOUND) {
                 return Collections.emptyList();
             } else {
                 throw new Win32Exception(errorCode);

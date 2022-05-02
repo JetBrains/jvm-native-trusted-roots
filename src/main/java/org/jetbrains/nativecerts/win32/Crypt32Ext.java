@@ -1,7 +1,6 @@
 package org.jetbrains.nativecerts.win32;
 
 import com.sun.jna.Native;
-import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WTypes;
 import com.sun.jna.platform.win32.WinCrypt;
 import com.sun.jna.win32.StdCallLibrary;
@@ -62,10 +61,6 @@ public interface Crypt32Ext extends StdCallLibrary {
     int CERT_SYSTEM_STORE_UNPROTECTED_FLAG = 0x40000000;
     int CERT_SYSTEM_STORE_RELOCATE_FLAG = 0x80000000;
 
-    // https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptencodeobjectex
-    int X509_ASN_ENCODING = 1;
-    int PKCS_7_ASN_ENCODING = 0x10000;
-
     Crypt32Ext INSTANCE = Native.load("Crypt32", Crypt32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
@@ -102,5 +97,5 @@ public interface Crypt32Ext extends StdCallLibrary {
             int dwEncodingType,
             WinCrypt.HCRYPTPROV_LEGACY hCryptProv,
             int dwFlags,
-            Pointer pvPara);
+            WTypes.LPWSTR pvPara);
 }
