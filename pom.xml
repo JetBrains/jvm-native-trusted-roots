@@ -31,6 +31,15 @@
         <tag>HEAD</tag>
     </scm>
 
+    <distributionManagement>
+        <repository>
+            <id>intellij-dependencies</id>
+            <!-- provide url via the 'repositoryUrl' command-line arg -->
+            <!--suppress MavenModelInspection -->
+            <url>${repositoryUrl}</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

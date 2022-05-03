@@ -1,0 +1,11 @@
+<settings>
+    <servers>
+        <server>
+            <id>intellij-dependencies</id>
+            <!-- provide credentials via the command-line args: -->
+            <!-- 'spaceUsername' and 'spacePassword' -->
+            <username>${spaceUsername}</username>
+            <password>${spacePassword}</password>
+        </server>
+    </servers>
+</settings>
