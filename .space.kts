@@ -10,8 +10,7 @@ job("Publish jvm-native-trusted-roots") {
 
         shellScript {
             content = """
-                #!/bin/bash
-                set -x -e -u -o pipefail
+                set -x -e -u
                 echo Build and run tests...
                 mvn clean package
                 echo Publish artifacts...
