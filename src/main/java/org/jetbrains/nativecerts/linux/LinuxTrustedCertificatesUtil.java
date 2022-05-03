@@ -71,7 +71,9 @@ public class LinuxTrustedCertificatesUtil {
 
             Set<X509Certificate> result = new HashSet<>();
             for (Path path : paths) {
-                result.addAll(tryReadFromFile(path));
+                if (Files.isRegularFile(path)) {
+                    result.addAll(tryReadFromFile(path));
+                }
             }
             return result;
         } catch (Throwable t) {
