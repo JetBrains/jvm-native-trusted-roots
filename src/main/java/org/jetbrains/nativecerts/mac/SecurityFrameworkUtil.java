@@ -12,10 +12,27 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class SecurityFrameworkUtil {
+    private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
+
     public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) throws CertificateException {
-        return SecTrustSettingsCopyCertificates(domain, cert -> isTrustedRoot(domain, cert));
+        List<X509Certificate> result = SecTrustSettingsCopyCertificates(domain, cert -> isTrustedRoot(domain, cert));
+
+        if (LOGGER.isLoggable(Level.FINE)) {
+            StringBuilder message = new StringBuilder();
+            message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
+
+            for (X509Certificate certificate : result) {
+                message.append("\n  ").append(certificate.getSubjectDN());
+            }
+
+            LOGGER.fine(message.toString());
+        }
+
+        return result;
     }
 
     @NotNull

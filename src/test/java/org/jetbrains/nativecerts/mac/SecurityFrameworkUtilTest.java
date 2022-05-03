@@ -1,17 +1,23 @@
 package org.jetbrains.nativecerts.mac;
 
+import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Locale;
+
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
 
 public class SecurityFrameworkUtilTest {
+    @Rule
+    public final NativeCertsSetupLoggingRule loggingRule = new NativeCertsSetupLoggingRule();
+
     @Test
     public void enumerateSystemCertificates() throws Exception {
-        Assume.assumeTrue("Requires Mac OS X", System.getProperty("os.name").toLowerCase(Locale.ROOT).startsWith("mac"));
+        Assume.assumeTrue("Requires Mac OS X", isMac);
 
         List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.system);
 
@@ -32,5 +38,7 @@ public class SecurityFrameworkUtilTest {
                 trustedRoots.stream().anyMatch(crt ->
                         crt.getSubjectDN().toString().contains("VeriSign"))
         );
+
+        Assert.assertEquals(0, loggingRule.numberOfWarningsOrAbove());
     }
 }
