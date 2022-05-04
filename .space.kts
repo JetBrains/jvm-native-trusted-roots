@@ -6,7 +6,7 @@ job("Publish jvm-native-trusted-roots") {
     }
 
     container("maven:3-openjdk-11") {
-        env["REPOSITORY_URL"] = "https://jetbrains.team/p/ij/packages/maven/intellij-dependencies"
+        env["REPOSITORY_URL"] = "https://packages.jetbrains.team/maven/p/ij/intellij-dependencies"
 
         shellScript {
             content = """
