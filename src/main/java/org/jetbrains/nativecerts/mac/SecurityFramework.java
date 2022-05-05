@@ -61,15 +61,11 @@ public interface SecurityFramework extends Library {
     @NotNull
     OSStatus SecCertificateCopyCommonName(@NotNull SecCertificateRef certificate, @NotNull CFStringRefByReference commonName);
 
-    /**
-     * @return
-     *      The unique identifier of the opaque type to which a certificate object belongs.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1396056-seccertificategettypeid">developer.apple.com</a>
-     */
     CoreFoundation.CFTypeID SecCertificateGetTypeID();
+    CoreFoundation.CFTypeID SecPolicyGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
+    CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
 
     /**
      * An abstract Core Foundation-type object representing an X.509 certificate.
@@ -89,6 +85,34 @@ public interface SecurityFramework extends Library {
     }
 
     /**
+     * An object that represents a trust policy.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/secpolicyref">developer.apple.com</a>
+     */
+    class SecPolicyRef extends CoreFoundation.CFTypeRef {
+        public SecPolicyRef() {
+        }
+
+        public SecPolicyRef(Pointer p) {
+            super(p);
+            if (!isTypeID(SEC_POLICY_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecPolicyRef. Type ID: " + getTypeID());
+            }
+        }
+    }
+
+    /**
+     * Returns a dictionary containing a policy’s properties.
+     *
+     * @return A dictionary with the policy's properties.
+     * See <a href="https://developer.apple.com/documentation/security/certificate_key_and_trust_services/policies/security_policy_keys">Security Policy Keys</a>
+     * for a list of valid keys. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to free the dictionary's memory when you are done with it.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/1401915-secpolicycopyproperties">developer.apple.com</a>
+     */
+    CoreFoundation.CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef secPolicyRef);
+
+    /**
      * Returns a DER representation of a certificate given a certificate object.
      *
      * @param certificate
@@ -105,11 +129,46 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFDataRef SecCertificateCopyData(SecCertificateRef certificate);
 
     /**
+     * Basic X509 plus host name verification per RFC 2818.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyapplessl">developer.apple.com</a>
+     */
+    CoreFoundation.CFStringRef kSecPolicyAppleSSL = CoreFoundation.CFStringRef.createCFString("1.2.840.113635.100.1.3");
+
+    /**
+     * The object identifier that defines the policy type (CFStringRef). All policies have a value for this key.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyoid">developer.apple.com</a>
+     */
+    CoreFoundation.CFStringRef kSecPolicyOid = CoreFoundation.CFStringRef.createCFString("SecPolicyOid");
+
+    /**
      * A number indicating the effective trust setting for this usage constraints dictionary.
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsresult">developer.apple.com</a>
      */
     CoreFoundation.CFStringRef kSecTrustSettingsResult = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsResult");
+
+    /**
+     * A number which, if encountered during certificate verification, is ignored for that certificate.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsallowederror">developer.apple.com</a>
+     */
+    CoreFoundation.CFStringRef kSecTrustSettingsAllowedError = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsAllowedError");
+
+    /**
+     * Specifies a cert verification policy, e.g., sslServer, eapClient, etc, using policy names.
+     * This entry can be used to restrict the policy where
+     * the same Policy Constant is used for multiple policyNames
+     */
+    CoreFoundation.CFStringRef kSecTrustSettingsPolicyName = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsPolicyName");
+
+    /**
+     * A policy object specifying the certificate verification policy.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingspolicy">developer.apple.com</a>
+     */
+    CoreFoundation.CFStringRef kSecTrustSettingsPolicy = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsPolicy");
 
     /**
      * Obtains the trust settings for a certificate.
@@ -130,7 +189,7 @@ public interface SecurityFramework extends Library {
      *          A result code. See {@link OSStatus}. Returns {@link OSStatus#errSecItemNotFound} if no trust settings
      *          exist for the specified certificate and domain.
      *
-     * @see <a href="https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting">https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting</a>
+     * @see <a href="https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting">developer.apple.com</a>
      */
     OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain, CFArrayRefByReference trustSettings);
 
@@ -213,6 +272,25 @@ public interface SecurityFramework extends Library {
             finally {
                 string.release();
             }
+        }
+
+        @Override
+        public boolean equals(Object rhs) {
+            if (!(rhs instanceof OSStatus)) {
+                return false;
+            }
+
+            return intValue() == ((OSStatus)rhs).intValue();
+        }
+
+        @Override
+        public int hashCode() {
+            return intValue();
+        }
+
+        @Override
+        public String toString() {
+            return getErrorMessageString();
         }
     }
 

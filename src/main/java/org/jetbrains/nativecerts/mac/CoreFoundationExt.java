@@ -15,4 +15,6 @@ public interface CoreFoundationExt extends Library {
      * @return The number of key-value pairs in theDict.
      */
     CoreFoundation.CFIndex CFDictionaryGetCount(CoreFoundation.CFDictionaryRef theDict);
+
+    boolean CFEqual(CoreFoundation.CFTypeRef cf1, CoreFoundation.CFTypeRef cf2);
 }

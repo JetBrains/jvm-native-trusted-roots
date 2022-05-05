@@ -7,12 +7,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
+
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha256hex;
 
 public class PemReaderUtilTest {
     @Test
@@ -69,7 +69,7 @@ public class PemReaderUtilTest {
 
         // same as openssl x509 -noout -fingerprint -sha256 -inform pem -in my.pem
         //noinspection SpellCheckingInspection
-        Assert.assertEquals("bd71fdf6da97e4cf62d1647add2581b07d79adf8397eb4ecba9c5e8488821423", sha256(result.get(0).getEncoded()));
+        Assert.assertEquals("bd71fdf6da97e4cf62d1647add2581b07d79adf8397eb4ecba9c5e8488821423", sha256hex(result.get(0).getEncoded()));
     }
 
     @Test
@@ -81,18 +81,5 @@ public class PemReaderUtilTest {
         }
 
         Assert.assertEquals(128, result.size());
-    }
-
-    private static String sha256(final byte[] bytes) throws NoSuchAlgorithmException {
-        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        final byte[] hash = digest.digest(bytes);
-        final StringBuilder hexString = new StringBuilder();
-        for (byte b : hash) {
-            final String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1)
-                hexString.append('0');
-            hexString.append(hex);
-        }
-        return hexString.toString();
     }
 }
