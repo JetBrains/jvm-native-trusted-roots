@@ -104,13 +104,14 @@ public interface SecurityFramework extends Library {
     /**
      * Returns a dictionary containing a policy’s properties.
      *
+     * @param policyRef The policy from which properties should be copied.
      * @return A dictionary with the policy's properties.
      * See <a href="https://developer.apple.com/documentation/security/certificate_key_and_trust_services/policies/security_policy_keys">Security Policy Keys</a>
      * for a list of valid keys. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to free the dictionary's memory when you are done with it.
      *
      * @see <a href="https://developer.apple.com/documentation/security/1401915-secpolicycopyproperties">developer.apple.com</a>
      */
-    CoreFoundation.CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef secPolicyRef);
+    CoreFoundation.CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef policyRef);
 
     /**
      * Returns a DER representation of a certificate given a certificate object.
