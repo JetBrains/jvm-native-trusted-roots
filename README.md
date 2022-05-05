@@ -20,3 +20,7 @@ Some tests on Windows/Mac require a user to confirm modification of the trust st
 ```
 mvn package -Dmanual.test=true
 ```
+
+## Releasing a new version (JetBrains internal only)
+
+Run job at [Publish jvm-native-trusted-roots @ Space](https://jetbrains.team/p/ij/automation/jobs/history/1ydHvJ2EWAKP)
