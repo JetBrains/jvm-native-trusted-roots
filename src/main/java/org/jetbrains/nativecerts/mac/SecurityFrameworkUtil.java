@@ -16,7 +16,14 @@ import java.util.logging.Logger;
 
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderExceptionMessage;
 
-// for the other implementations see root_cgo_darwin.go in Go and trust_store_mac.cc in Chromium
+/**
+ * Get trusted certificates stored in corresponding keychains via Security frameworks APIs.
+ * for the other implementations see root_cgo_darwin.go in Go and trust_store_mac.cc in Chromium
+ * <br><br>
+ * In the future it would be better to implement {@code X509TrustManager} on <a href="https://developer.apple.com/documentation/security/2980705-sectrustevaluatewitherror">SecTrustEvaluateWithError</a> instead
+ * of getting trust chain manually. It's not yet investigated whether it is possible at all to integrate it into
+ * the SSL framework of JVM.
+ */
 public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
