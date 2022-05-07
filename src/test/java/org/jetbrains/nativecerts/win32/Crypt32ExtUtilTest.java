@@ -17,6 +17,7 @@ import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStdout;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha1hex;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha256hex;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isWindows;
@@ -54,6 +55,8 @@ public class Crypt32ExtUtilTest {
 
     @Test
     public void realUserTrustedCertificateTest() throws Exception {
+        Assume.assumeTrue(isManualTestingEnabled);
+
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
