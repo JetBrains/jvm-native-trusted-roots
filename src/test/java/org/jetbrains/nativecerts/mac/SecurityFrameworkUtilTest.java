@@ -105,36 +105,41 @@ public class SecurityFrameworkUtilTest {
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
 
-        List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-        assertFalse(rootsBefore.contains(getTestCertificate()));
+        try {
+            List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            assertFalse(rootsBefore.contains(getTestCertificate()));
 
-        Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
+            Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
 
-        executeProcess(
-                combineLists(
-                        List.of("/usr/bin/security", "add-trusted-cert"),
-                        policy == null ? Collections.emptyList() : List.of("-p", policy),
-                        List.of("-r", resultType, "-k", loginKeyChain.toString(), getTestCertificatePath().toString())
-                )
-        );
+            executeProcess(
+                    combineLists(
+                            List.of("/usr/bin/security", "add-trusted-cert"),
+                            policy == null ? Collections.emptyList() : List.of("-p", policy),
+                            List.of("-r", resultType, "-k", loginKeyChain.toString(), getTestCertificatePath().toString())
+                    )
+            );
 
-        // verify cert is async
-        Thread.sleep(3000);
-        Assert.assertEquals(shouldTrust, verifyCert(getTestCertificatePath(), policy));
+            // verify cert is async
+            Thread.sleep(3000);
+            Assert.assertEquals(shouldTrust, verifyCert(getTestCertificatePath(), policy));
 
-        String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
-        Assert.assertTrue(trustSettings, trustSettings.contains("certificates-tests.labs.intellij.net"));
+            String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
+            Assert.assertTrue(trustSettings, trustSettings.contains("certificates-tests.labs.intellij.net"));
 
-        List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-        assertEquals(shouldTrust, rootsAfter.contains(getTestCertificate()));
+            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            assertEquals(shouldTrust, rootsAfter.contains(getTestCertificate()));
 
-        assertTrue(removeTrustedCert(getTestCertificatePath()));
-        // verify cert is async
-        Thread.sleep(3000);
-        Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
+            assertTrue(removeTrustedCert(getTestCertificatePath()));
+            // verify cert is async
+            Thread.sleep(3000);
+            Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
 
-        List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-        assertFalse(rootsAfterRemoval.contains(getTestCertificate()));
+            List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            assertFalse(rootsAfterRemoval.contains(getTestCertificate()));
+        } finally {
+            // even if test fails we must remove trusted certificate
+            removeTrustedCert(getTestCertificatePath());
+        }
     }
 
     @Test
