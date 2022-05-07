@@ -105,7 +105,12 @@ public class NativeCertsTestUtil {
         }
     }
 
-    public static String executeProcessGetStdout(String... command) {
+    public enum ExitCodeHandling {
+        ASSERT,
+        IGNORE,
+    }
+
+    public static String executeProcessGetStdout(ExitCodeHandling exitCodeHandling, String... command) {
         try {
             Path out = Files.createTempFile("process-stdout-", ".txt");
             try {
@@ -120,8 +125,9 @@ public class NativeCertsTestUtil {
                     process.destroyForcibly();
                     throw new IllegalStateException("Timeout waiting for process " + String.join(" ", command));
                 }
+
                 int rc = process.exitValue();
-                if (rc != 0) {
+                if (rc != 0 && exitCodeHandling == ExitCodeHandling.ASSERT) {
                     throw new IllegalStateException("Process [" + String.join(" ", command) + "] exited with exit code " + rc);
                 }
 

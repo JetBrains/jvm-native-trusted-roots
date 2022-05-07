@@ -2,8 +2,10 @@ package org.jetbrains.nativecerts.mac;
 
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -13,18 +15,37 @@ import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
 
-import static org.jetbrains.nativecerts.NativeCertsTestUtil.*;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.ExitCodeHandling;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.combineLists;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessAndGetExitCode;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStdout;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha1hex;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha256hex;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class SecurityFrameworkUtilTest {
     @Rule
     public final NativeCertsSetupLoggingRule loggingRule = new NativeCertsSetupLoggingRule();
 
+    @BeforeClass
+    public static void beforeClass() {
+        Assume.assumeTrue("Requires Mac OS X", isMac);
+    }
+
+    @After
+    public void afterTest() {
+        assertEquals(0, loggingRule.numberOfWarningsOrAbove());
+    }
+
     @Test
     public void enumerateSystemCertificates() {
-        Assume.assumeTrue("Requires Mac OS X", isMac);
-
         List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.system);
 
         System.out.println(trustedRoots.size());
@@ -44,8 +65,6 @@ public class SecurityFrameworkUtilTest {
                 trustedRoots.stream().anyMatch(crt ->
                         crt.getSubjectDN().toString().contains("VeriSign"))
         );
-
-        assertEquals(0, loggingRule.numberOfWarningsOrAbove());
     }
 
     @Test
@@ -62,8 +81,9 @@ public class SecurityFrameworkUtilTest {
 
     @Test
     public void addRealUserTrustedCertificate_deny() throws Exception {
-        // see https://github.com/golang/go/issues/24084
         Assume.assumeTrue(isManualTestingEnabled);
+
+        // see https://github.com/golang/go/issues/24084
         customUserTrustedCertificateTest("ssl", "deny", false);
     }
 
@@ -102,7 +122,7 @@ public class SecurityFrameworkUtilTest {
         Thread.sleep(3000);
         Assert.assertEquals(shouldTrust, verifyCert(getTestCertificatePath(), policy));
 
-        String trustSettings = executeProcessGetStdout("/usr/bin/security", "dump-trust-setting");
+        String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
         Assert.assertTrue(trustSettings, trustSettings.contains("certificates-tests.labs.intellij.net"));
 
         List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
