@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public class NativeCertsTestUtil {
-    public static boolean isManualTestingEnabled = toBooleanChecked(System.getProperty("manual.test", "false"));
+    public static final boolean isManualTestingEnabled = toBooleanChecked(System.getProperty("manual.test", "false"));
 
     private static boolean toBooleanChecked(String value) {
         switch (value) {
