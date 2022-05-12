@@ -198,7 +198,6 @@ public class SecurityFrameworkUtil {
                         SecurityFramework.SecPolicyRef secPolicyRef = new SecurityFramework.SecPolicyRef(value);
 
                         CoreFoundation.CFDictionaryRef policyDictionaryRef = SecurityFramework.INSTANCE.SecPolicyCopyProperties(secPolicyRef);
-                        System.out.println(CoreFoundation.INSTANCE.CFCopyDescription(policyDictionaryRef).stringValue());
                         try {
                             Pointer policyOid = policyDictionaryRef.getValue(SecurityFramework.kSecPolicyOid);
                             if (policyOid == null) {
