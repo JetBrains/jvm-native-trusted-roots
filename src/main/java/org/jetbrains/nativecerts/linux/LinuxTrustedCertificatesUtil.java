@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.nativecerts.win32.Crypt32ExtUtil;
 
 import java.io.InputStream;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
@@ -94,11 +95,6 @@ public class LinuxTrustedCertificatesUtil {
                 return Collections.emptyList();
             }
 
-            if (!Files.isReadable(file)) {
-                LOGGER.warning("Not reading certificates from " + file + ": unable to read");
-                return Collections.emptyList();
-            }
-
             try (InputStream stream = Files.newInputStream(file)) {
                 List<X509Certificate> list = PemReaderUtil.readPemBundle(stream, file.toString());
 
@@ -115,6 +111,9 @@ public class LinuxTrustedCertificatesUtil {
 
                 return list;
             }
+        } catch (AccessDeniedException t) {
+            LOGGER.warning("Not reading certificates from " + file + ": access denied");
+            return Collections.emptyList();
         } catch (Throwable t) {
             LOGGER.warning(renderExceptionMessage("Unable to read certificates from " + file, t));
             return Collections.emptyList();
