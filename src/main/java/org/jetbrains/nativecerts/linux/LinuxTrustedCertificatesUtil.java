@@ -89,6 +89,16 @@ public class LinuxTrustedCertificatesUtil {
                 return Collections.emptyList();
             }
 
+            if (!Files.isRegularFile(file)) {
+                LOGGER.warning("Not reading certificates from " + file + ": not a regular file");
+                return Collections.emptyList();
+            }
+
+            if (!Files.isReadable(file)) {
+                LOGGER.warning("Not reading certificates from " + file + ": unable to read");
+                return Collections.emptyList();
+            }
+
             try (InputStream stream = Files.newInputStream(file)) {
                 List<X509Certificate> list = PemReaderUtil.readPemBundle(stream, file.toString());
 
