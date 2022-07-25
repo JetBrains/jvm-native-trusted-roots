@@ -1,14 +1,17 @@
 package org.jetbrains.nativecerts.linux;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.nativecerts.win32.Crypt32ExtUtil;
 
 import java.io.InputStream;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -17,7 +20,7 @@ import java.util.stream.Stream;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderExceptionMessage;
 
 public class LinuxTrustedCertificatesUtil {
-    private final static Logger LOGGER = Logger.getLogger(Crypt32ExtUtil.class.getName());
+    private final static Logger LOGGER = Logger.getLogger(LinuxTrustedCertificatesUtil.class.getName());
 
     // The same discovery logic as in Go
     // https://github.com/golang/go/blob/0668e3cb1a8407547f1b4e316748d3b898564f8e/src/crypto/x509/root_linux.go

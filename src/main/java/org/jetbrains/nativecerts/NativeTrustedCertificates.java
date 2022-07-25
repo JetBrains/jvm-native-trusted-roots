@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.*;
 
 public class NativeTrustedCertificates {
-    private static final Logger LOGGER = Logger.getLogger(NativeTrustedRootsInternalUtils.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(NativeTrustedCertificates.class.getName());
 
     /**
      * Get custom trusted certificates from the operating system.
