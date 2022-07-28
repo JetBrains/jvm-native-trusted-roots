@@ -23,9 +23,9 @@ import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStd
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
-import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha1hex;
-import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha256hex;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha1hex;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha256hex;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

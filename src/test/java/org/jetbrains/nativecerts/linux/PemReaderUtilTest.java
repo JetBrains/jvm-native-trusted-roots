@@ -12,7 +12,7 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
 
-import static org.jetbrains.nativecerts.NativeCertsTestUtil.sha256hex;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha256hex;
 
 public class PemReaderUtilTest {
     @Test

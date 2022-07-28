@@ -5,8 +5,6 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -49,37 +47,6 @@ public class NativeCertsTestUtil {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static String sha256hex(final byte[] bytes) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            final byte[] hash = digest.digest(bytes);
-            return toHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String sha1hex(final byte[] bytes) {
-        try {
-            final MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            final byte[] hash = digest.digest(bytes);
-            return toHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static String toHex(byte[] bytes) {
-        final StringBuilder hexString = new StringBuilder();
-        for (byte b : bytes) {
-            final String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1)
-                hexString.append('0');
-            hexString.append(hex);
-        }
-        return hexString.toString();
     }
 
     public static void executeProcess(List<String> command) {
