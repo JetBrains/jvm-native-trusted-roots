@@ -28,7 +28,8 @@ public class NativeTrustedRootsDebugMain {
         int index = 1;
         for (X509Certificate certificate : trustedCertificates) {
             message.append("  ").append(index).append(" / ").append(trustedCertificates.size()).append(". ")
-                    .append(certificate.getSubjectDN()).append(" ").append(sha256hex(certificate.getEncoded()));
+                    .append(certificate.getSubjectDN()).append(" ").append(sha256hex(certificate.getEncoded()))
+                    .append('\n');
             index++;
         }
 
