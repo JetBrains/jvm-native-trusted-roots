@@ -158,7 +158,7 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFStringRef kSecTrustSettingsAllowedError = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsAllowedError");
 
     /**
-     * Specifies a cert verification policy, e.g., sslServer, eapClient, etc, using policy names.
+     * Specifies a cert verification policy, e.g., sslServer, eapClient, etc. using policy names.
      * This entry can be used to restrict the policy where
      * the same Policy Constant is used for multiple policyNames
      */
