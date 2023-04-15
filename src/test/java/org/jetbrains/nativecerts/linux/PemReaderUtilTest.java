@@ -65,10 +65,9 @@ public class PemReaderUtilTest {
         List<X509Certificate> result = PemReaderUtil.readPemBundle(new ByteArrayInputStream(data.getBytes(StandardCharsets.US_ASCII)), "test");
         Assert.assertEquals(1, result.size());
 
-        Assert.assertEquals("CN=AffirmTrust Premium ECC, O=AffirmTrust, C=US", result.get(0).getSubjectDN().toString());
+        Assert.assertEquals("C=US,O=AffirmTrust,CN=AffirmTrust Premium ECC", result.get(0).getSubjectDN().toString());
 
         // same as openssl x509 -noout -fingerprint -sha256 -inform pem -in my.pem
-        //noinspection SpellCheckingInspection
         Assert.assertEquals("bd71fdf6da97e4cf62d1647add2581b07d79adf8397eb4ecba9c5e8488821423", sha256hex(result.get(0).getEncoded()));
     }
 
