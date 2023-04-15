@@ -72,7 +72,12 @@ public class SecurityFrameworkUtil {
                     continue;
                 }
 
-                result.add(getX509Certificate(secCertificateRef));
+                try {
+                    result.add(getX509Certificate(secCertificateRef));
+                } catch (Throwable parsingError) {
+                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                    LOGGER.warning(renderExceptionMessage("Unable to parse certificate '" + certificateDescription + "'", parsingError));
+                }
             }
 
             return result;

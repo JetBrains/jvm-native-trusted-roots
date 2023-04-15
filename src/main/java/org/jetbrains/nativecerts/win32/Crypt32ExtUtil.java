@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 import static com.sun.jna.platform.win32.WinError.CRYPT_E_NOT_FOUND;
 import static com.sun.jna.platform.win32.WinError.ERROR_FILE_NOT_FOUND;
 import static com.sun.jna.platform.win32.WinError.ERROR_NO_MORE_FILES;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderExceptionMessage;
 
 public class Crypt32ExtUtil {
     private final static Logger LOGGER = Logger.getLogger(Crypt32ExtUtil.class.getName());
@@ -102,8 +103,15 @@ public class Crypt32ExtUtil {
 
                 byte[] bytes = certificate.pbCertEncoded.getByteArray(0, certificate.cbCertEncoded);
 
-                X509Certificate x509 = NativeTrustedRootsInternalUtils.parseCertificate(bytes);
-                result.add(x509);
+                try {
+                    X509Certificate x509 = NativeTrustedRootsInternalUtils.parseCertificate(bytes);
+                    result.add(x509);
+                } catch (Throwable parsingException) {
+                    LOGGER.warning(renderExceptionMessage(
+                            "Unable to parse one of the certificates" +
+                                    "from store '" + store_name + "'",
+                            parsingException));
+                }
 
                 prev = certificate;
             }
