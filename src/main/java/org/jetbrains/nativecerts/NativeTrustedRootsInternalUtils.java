@@ -1,12 +1,17 @@
 package org.jetbrains.nativecerts;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Locale;
 
 @ApiStatus.Internal
@@ -51,5 +56,18 @@ public class NativeTrustedRootsInternalUtils {
             hexString.append(hex);
         }
         return hexString.toString();
+    }
+
+    public static X509Certificate parseCertificate(byte[] bytes) {
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509", BouncyCastleLazyProvider.INSTANCE);
+            return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(bytes));
+        } catch (CertificateException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static class BouncyCastleLazyProvider {
+        public static BouncyCastleProvider INSTANCE = new BouncyCastleProvider();
     }
 }

@@ -2,17 +2,26 @@ package org.jetbrains.nativecerts.win32;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
-import com.sun.jna.platform.win32.*;
+import com.sun.jna.platform.win32.Crypt32;
+import com.sun.jna.platform.win32.Kernel32Util;
+import com.sun.jna.platform.win32.WTypes;
+import com.sun.jna.platform.win32.Win32Exception;
+import com.sun.jna.platform.win32.WinCrypt;
+import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
 
-import java.io.ByteArrayInputStream;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.sun.jna.platform.win32.WinError.*;
+import static com.sun.jna.platform.win32.WinError.CRYPT_E_NOT_FOUND;
+import static com.sun.jna.platform.win32.WinError.ERROR_FILE_NOT_FOUND;
+import static com.sun.jna.platform.win32.WinError.ERROR_NO_MORE_FILES;
 
 public class Crypt32ExtUtil {
     private final static Logger LOGGER = Logger.getLogger(Crypt32ExtUtil.class.getName());
@@ -25,7 +34,7 @@ public class Crypt32ExtUtil {
             "CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY", Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER_GROUP_POLICY
     );
 
-    public static Collection<X509Certificate> getCustomTrustedRootCertificates() throws CertificateException {
+    public static Collection<X509Certificate> getCustomTrustedRootCertificates() {
         HashSet<X509Certificate> result = new HashSet<>();
 
         for (Map.Entry<String, Integer> entry : customTrustedCertificatesLocations.entrySet()) {
@@ -54,7 +63,7 @@ public class Crypt32ExtUtil {
         }
     }
 
-    public static List<X509Certificate> gatherEnterpriseCertsForLocation(int location, String store_name) throws CertificateException {
+    public static List<X509Certificate> gatherEnterpriseCertsForLocation(int location, String store_name) {
         int flags = location | Crypt32Ext.CERT_STORE_OPEN_EXISTING_FLAG | Crypt32Ext.CERT_STORE_READONLY_FLAG;
 
         WinCrypt.HCERTSTORE hcertstore =
@@ -73,8 +82,6 @@ public class Crypt32ExtUtil {
                 throw new Win32Exception(errorCode);
             }
         }
-
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
         try {
             List<X509Certificate> result = new ArrayList<>();
@@ -95,7 +102,7 @@ public class Crypt32ExtUtil {
 
                 byte[] bytes = certificate.pbCertEncoded.getByteArray(0, certificate.cbCertEncoded);
 
-                X509Certificate x509 = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(bytes));
+                X509Certificate x509 = NativeTrustedRootsInternalUtils.parseCertificate(bytes);
                 result.add(x509);
 
                 prev = certificate;

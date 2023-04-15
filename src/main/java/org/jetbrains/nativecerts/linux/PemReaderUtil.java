@@ -1,11 +1,13 @@
 package org.jetbrains.nativecerts.linux;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -16,8 +18,7 @@ public class PemReaderUtil {
     private static final String BEGIN_CERT = "-----BEGIN CERTIFICATE-----";
     private static final String END_CERT = "-----END CERTIFICATE-----";
 
-    public static List<X509Certificate> readPemBundle(@NotNull InputStream inputStream, @NotNull String moniker) throws IOException, CertificateException {
-        CertificateFactory factory = CertificateFactory.getInstance("X.509");
+    public static List<X509Certificate> readPemBundle(@NotNull InputStream inputStream, @NotNull String moniker) throws IOException {
         List<X509Certificate> result = new ArrayList<>();
 
         try (LineNumberReader reader = new LineNumberReader(new InputStreamReader(inputStream, StandardCharsets.US_ASCII))) {
@@ -51,9 +52,7 @@ public class PemReaderUtil {
                     }
 
                     byte[] derEncoding = Base64.getDecoder().decode(base64encoded.toString());
-                    X509Certificate certificate = (X509Certificate) factory.generateCertificate(
-                            new ByteArrayInputStream(derEncoding)
-                    );
+                    X509Certificate certificate = NativeTrustedRootsInternalUtils.parseCertificate(derEncoding);
                     result.add(certificate);
                 }
 

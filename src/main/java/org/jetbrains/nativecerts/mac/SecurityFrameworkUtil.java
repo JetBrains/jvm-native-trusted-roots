@@ -3,9 +3,8 @@ package org.jetbrains.nativecerts.mac;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
 
-import java.io.ByteArrayInputStream;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,8 +85,7 @@ public class SecurityFrameworkUtil {
         CoreFoundation.CFDataRef data = SecurityFramework.INSTANCE.SecCertificateCopyData(secCertificateRef);
         try {
             byte[] bytes = data.getBytePtr().getByteArray(0, data.getLength());
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(bytes));
+            return NativeTrustedRootsInternalUtils.parseCertificate(bytes);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -135,7 +133,7 @@ public class SecurityFrameworkUtil {
         try {
             if (trustedSettingsArray.getCount() == 0) {
                 // https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
-                // An empty trust settings array (that is, the trustSettings parameter returns a valid but empty CFArray) means "always trust this certificate” with an overall trust setting for the certificate of kSecTrustSettingsResultTrustRoot
+                // An empty trust settings array (that is, the trustSettings parameter returns a valid but empty CFArray) means "always trust this certificate" with an overall trust setting for the certificate of kSecTrustSettingsResultTrustRoot
                 return true;
             }
 

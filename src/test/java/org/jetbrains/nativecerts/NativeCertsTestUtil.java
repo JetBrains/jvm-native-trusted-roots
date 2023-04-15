@@ -1,11 +1,13 @@
 package org.jetbrains.nativecerts;
 
-import java.io.ByteArrayInputStream;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,9 +44,16 @@ public class NativeCertsTestUtil {
     public static X509Certificate getTestCertificate() {
         try {
             byte[] bytes = Files.readAllBytes(getTestCertificatePath());
-            CertificateFactory factory = CertificateFactory.getInstance("X.509");
-            return (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(bytes));
+            return NativeTrustedRootsInternalUtils.parseCertificate(bytes);
         } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] getResourceBytes(@NotNull String resourceName) {
+        try (InputStream stream = NativeCertsTestUtil.class.getResourceAsStream(resourceName)) {
+            return Objects.requireNonNull(stream, "Resource not found: " + resourceName).readAllBytes();
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
