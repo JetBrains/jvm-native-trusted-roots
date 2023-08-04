@@ -13,6 +13,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @ApiStatus.Internal
 public class NativeTrustedRootsInternalUtils {
@@ -60,8 +62,39 @@ public class NativeTrustedRootsInternalUtils {
 
     public static X509Certificate parseCertificate(byte[] bytes) {
         try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509", BouncyCastleLazyProvider.INSTANCE);
-            return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(bytes));
+            // Try to parse with a standard provider (usually the provider bundled with JRE)
+            return parseCertificate(bytes, CertificateFactory.getInstance("X.509"));
+        } catch (Throwable e) {
+            Logger logger = Logger.getLogger(NativeTrustedRootsInternalUtils.class.getName());
+
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine(renderExceptionMessage("Unable to parse certificate with a standard X509 parser, falling back to BouncyCastle", e));
+            }
+
+            // If it fails, fallback to explicitly specified BouncyCastle provider
+            // see, e.g., https://youtrack.jetbrains.com/issue/IDEA-318004
+
+            CertificateFactory bcProvider;
+            try {
+                bcProvider = CertificateFactory.getInstance("X.509", BouncyCastleLazyProvider.INSTANCE);
+            } catch (CertificateException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            return parseCertificate(bytes, bcProvider);
+        }
+    }
+
+    static X509Certificate parseCertificate(byte[] bytes, CertificateFactory cf) {
+        try {
+            X509Certificate certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(bytes));
+
+            // force parsing of the certificate to mitigate errors like
+            // IDE fails to connect to network due to "invalid info structure in RSA public key" error in my corporate network
+            // https://youtrack.jetbrains.com/issue/IDEA-327220
+            certificate.getPublicKey();
+
+            return certificate;
         } catch (CertificateException e) {
             throw new RuntimeException(e);
         }

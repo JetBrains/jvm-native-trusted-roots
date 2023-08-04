@@ -7,7 +7,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
@@ -16,7 +15,7 @@ import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha256he
 
 public class PemReaderUtilTest {
     @Test
-    public void unfinishedBlock() throws CertificateException, IOException {
+    public void unfinishedBlock() throws IOException {
         @SuppressWarnings("SpellCheckingInspection")
         String data = "-----BEGIN CERTIFICATE-----\n" +
                 "MIIDlDCCAnygAwIBAgIKMfXkYgxsWO3W2DANBgkqhkiG9w0BAQsFADBnMQswCQYD\n" +
@@ -31,7 +30,7 @@ public class PemReaderUtilTest {
     }
 
     @Test
-    public void wrongBlock() throws CertificateException, IOException {
+    public void wrongBlock() throws IOException {
         @SuppressWarnings("SpellCheckingInspection")
         String data = "-----BEGIN PRIVATE KEY-----\n" +
                 "MIIDlDCCAnygAwIBAgIKMfXkYgxsWO3W2DANBgkqhkiG9w0BAQsFADBnMQswCQYD\n" +
@@ -65,7 +64,7 @@ public class PemReaderUtilTest {
         List<X509Certificate> result = PemReaderUtil.readPemBundle(new ByteArrayInputStream(data.getBytes(StandardCharsets.US_ASCII)), "test");
         Assert.assertEquals(1, result.size());
 
-        Assert.assertEquals("C=US,O=AffirmTrust,CN=AffirmTrust Premium ECC", result.get(0).getSubjectDN().toString());
+        Assert.assertEquals("CN=AffirmTrust Premium ECC, O=AffirmTrust, C=US", result.get(0).getSubjectX500Principal().toString());
 
         // same as openssl x509 -noout -fingerprint -sha256 -inform pem -in my.pem
         Assert.assertEquals("bd71fdf6da97e4cf62d1647add2581b07d79adf8397eb4ecba9c5e8488821423", sha256hex(result.get(0).getEncoded()));
