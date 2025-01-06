@@ -2,6 +2,7 @@ package org.jetbrains.nativecerts.mac;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 
 public interface CoreFoundationExt extends Library {
@@ -15,6 +16,15 @@ public interface CoreFoundationExt extends Library {
      * @return The number of key-value pairs in theDict.
      */
     CoreFoundation.CFIndex CFDictionaryGetCount(CoreFoundation.CFDictionaryRef theDict);
+
+    CoreFoundation.CFDictionaryRef CFDictionaryCreate(
+            CoreFoundation.CFAllocatorRef alloc,
+            CoreFoundation.CFTypeRef[] searchKeys,
+            CoreFoundation.CFTypeRef[] searchValues,
+            CoreFoundation.CFIndex capacity,
+            Pointer keyCallBacks,
+            Pointer valueCallBacks
+    );
 
     boolean CFEqual(CoreFoundation.CFTypeRef cf1, CoreFoundation.CFTypeRef cf2);
 }

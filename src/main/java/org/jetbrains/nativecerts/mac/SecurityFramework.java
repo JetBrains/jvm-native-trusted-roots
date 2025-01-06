@@ -2,6 +2,7 @@ package org.jetbrains.nativecerts.mac;
 
 import com.sun.jna.*;
 import com.sun.jna.platform.mac.CoreFoundation;
+import com.sun.jna.ptr.PointerByReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,6 +46,9 @@ public interface SecurityFramework extends Library {
      */
     @NotNull
     OSStatus SecTrustSettingsCopyCertificates(@NotNull SecTrustSettingsDomain domain, @NotNull CFArrayRefByReference certArray);
+
+    @NotNull
+    OSStatus SecItemCopyMatching(@NotNull CoreFoundation.CFDictionaryRef query, CFArrayRefByReference result);
 
     /**
      * Retrieves the common name of the subject of a certificate.
@@ -100,6 +104,44 @@ public interface SecurityFramework extends Library {
             }
         }
     }
+
+    /**
+     * An object used to evaluate trust.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrust">developer.apple.com</a>
+     */
+    class SecTrustRef extends CoreFoundation.CFTypeRef {
+        public SecTrustRef() {
+        }
+
+        public SecTrustRef(Pointer p) {
+            super(p);
+            if (!isTypeID(SEC_POLICY_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecTrustRef. Type ID: " + getTypeID());
+            }
+        }
+    }
+
+    class SecTrustRefByReference extends PointerByReference {
+        public SecTrustRefByReference() {
+        }
+
+        public SecTrustRefByReference(SecTrustRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public SecTrustRef getSecTrustRef() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new SecTrustRef(value);
+        }
+    }
+
+    SecTrustRef SecPolicyCreateBasicX509();
 
     /**
      * Returns a dictionary containing a policy’s properties.
@@ -194,6 +236,9 @@ public interface SecurityFramework extends Library {
      */
     OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain, CFArrayRefByReference trustSettings);
 
+    OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecTrustRef policies, SecTrustRefByReference trust);
+
+    boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
     /**
      * Trust settings returned in usage constraints dictionaries.
      *

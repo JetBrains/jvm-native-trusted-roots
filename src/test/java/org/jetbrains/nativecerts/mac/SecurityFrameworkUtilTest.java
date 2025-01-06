@@ -14,7 +14,13 @@ import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.ExitCodeHandling;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.combineLists;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
@@ -85,6 +91,17 @@ public class SecurityFrameworkUtilTest {
 
         // see https://github.com/golang/go/issues/24084
         customUserTrustedCertificateTest("ssl", "deny", false);
+    }
+
+    @Test
+    public void verifyCert() throws Exception {
+        List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+
+        List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectDN().toString())
+                .collect(Collectors.toList());
+        assertThat(aliases, hasItem("CN=TIMJA-ROOT, O=TIMJA, ST=ES, C=UK"));
+        assertThat(aliases.size(), is(greaterThan(1)));
+        assertThat(aliases, hasItem("CN=TIMJA-INTERMEDIATE, O=TIMJA, ST=ES, C=UK"));
     }
 
     /**
