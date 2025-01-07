@@ -59,7 +59,7 @@ public class KeyChainStore {
         } catch (KeyStoreException e) {
             // only available from Java 23
             if (e.getMessage().equals("KeychainStore-ROOT not found")) {
-                return Collections.emptyList();
+                return SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.admin);
             }
             throw new RuntimeException(e);
         } catch (NoSuchProviderException | IOException | NoSuchAlgorithmException |

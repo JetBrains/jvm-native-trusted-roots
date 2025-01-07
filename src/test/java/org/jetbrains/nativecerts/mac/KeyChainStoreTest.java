@@ -54,21 +54,18 @@ public class KeyChainStoreTest {
             System.out.println(root.getSubjectDN().toString());
         }
 
-        // TODO remove when minimum Java version is 23 or higher
-        if (Runtime.version().feature() >= 23) {
-            Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
+        Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
 
-            Assert.assertTrue(
-                    "Expected some roots from 'Google Trust Services LLC'",
-                    trustedRoots.stream().anyMatch(crt ->
-                            crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
-            );
-            Assert.assertTrue(
-                    "Expected some roots from 'VeriSign'",
-                    trustedRoots.stream().anyMatch(crt ->
-                            crt.getSubjectDN().toString().contains("VeriSign"))
-            );
-        }
+        Assert.assertTrue(
+                "Expected some roots from 'Google Trust Services LLC'",
+                trustedRoots.stream().anyMatch(crt ->
+                        crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
+        );
+        Assert.assertTrue(
+                "Expected some roots from 'VeriSign'",
+                trustedRoots.stream().anyMatch(crt ->
+                        crt.getSubjectDN().toString().contains("VeriSign"))
+        );
     }
 
     @Test
