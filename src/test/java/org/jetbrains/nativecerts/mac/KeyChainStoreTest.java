@@ -12,6 +12,7 @@ import org.junit.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -30,7 +31,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class SecurityFrameworkUtilTest {
+public class KeyChainStoreTest {
     @Rule
     public final NativeCertsSetupLoggingRule loggingRule = new NativeCertsSetupLoggingRule();
 
@@ -46,25 +47,28 @@ public class SecurityFrameworkUtilTest {
 
     @Test
     public void enumerateSystemCertificates() {
-        List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.system);
+        Collection<X509Certificate> trustedRoots = KeyChainStore.getAllTrustedCertificates();
 
         System.out.println(trustedRoots.size());
         for (X509Certificate root : trustedRoots) {
             System.out.println(root.getSubjectDN().toString());
         }
 
-        Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
+        // TODO remove when minimum Java version is 23 or higher
+        if (Runtime.version().feature() >= 23) {
+            Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
 
-        Assert.assertTrue(
-                "Expected some roots from 'Google Trust Services LLC'",
-                trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
-        );
-        Assert.assertTrue(
-                "Expected some roots from 'VeriSign'",
-                trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("VeriSign"))
-        );
+            Assert.assertTrue(
+                    "Expected some roots from 'Google Trust Services LLC'",
+                    trustedRoots.stream().anyMatch(crt ->
+                            crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
+            );
+            Assert.assertTrue(
+                    "Expected some roots from 'VeriSign'",
+                    trustedRoots.stream().anyMatch(crt ->
+                            crt.getSubjectDN().toString().contains("VeriSign"))
+            );
+        }
     }
 
     @Test
@@ -98,15 +102,15 @@ public class SecurityFrameworkUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
-        assertEquals("a2133a948547091abc0e0f62aa27bb1927b03f10", sha1);
+        assertEquals("c64a34966d69b4bed3caa374998a5066ede0f898", sha1);
         //noinspection SpellCheckingInspection
-        assertEquals("d5976cf01a27686e61c1ab79907ceed01a9d74a5c7495aad617a7df88fbec204", sha256);
+        assertEquals("947565b3b4b08c936f0ad5b306062418c61cd2600e109cfdee8318ca69cca16e", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
 
         try {
-            List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsBefore = KeyChainStore.getCustomTrustedCertificates();
             assertFalse(rootsBefore.contains(getTestCertificate()));
 
             Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
@@ -126,7 +130,7 @@ public class SecurityFrameworkUtilTest {
             String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
             Assert.assertTrue(trustSettings, trustSettings.contains("certificates-tests.labs.intellij.net"));
 
-            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsAfter = KeyChainStore.getCustomTrustedCertificates();
             assertEquals(shouldTrust, rootsAfter.contains(getTestCertificate()));
 
             assertTrue(removeTrustedCert(getTestCertificatePath()));
@@ -134,7 +138,7 @@ public class SecurityFrameworkUtilTest {
             Thread.sleep(3000);
             Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
 
-            List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsAfterRemoval = KeyChainStore.getCustomTrustedCertificates();
             assertFalse(rootsAfterRemoval.contains(getTestCertificate()));
         } finally {
             // even if test fails we must remove trusted certificate
@@ -144,7 +148,7 @@ public class SecurityFrameworkUtilTest {
 
     @Test
     public void testCertificateIsSelfSigned() {
-        assertTrue(SecurityFrameworkUtil.isSelfSignedCertificate(getTestCertificate()));
+        assertTrue(KeyChainStore.isSelfSignedCertificate(getTestCertificate()));
     }
 
     private static boolean verifyCert(Path cert, @Nullable String policy) {

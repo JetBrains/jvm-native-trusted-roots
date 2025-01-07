@@ -1,8 +1,7 @@
 package org.jetbrains.nativecerts;
 
 import org.jetbrains.nativecerts.linux.LinuxTrustedCertificatesUtil;
-import org.jetbrains.nativecerts.mac.SecurityFramework;
-import org.jetbrains.nativecerts.mac.SecurityFrameworkUtil;
+import org.jetbrains.nativecerts.mac.KeyChainStore;
 import org.jetbrains.nativecerts.win32.Crypt32ExtUtil;
 
 import java.security.cert.X509Certificate;
@@ -17,7 +16,7 @@ public class NativeTrustedCertificates {
     /**
      * Get custom trusted certificates from the operating system.
      * Uses platform-specific APIs. Does not fail, only logs to java util logging.
-     * On some systems (currently, Linux) may return an entire set of trusted certificates.
+     * On some systems (currently, Linux and macOS (on Java >=23) may return an entire set of trusted certificates.
      * <p>
      * To get more logging on user's machine enable FINE logging level for {@code org.jetbrains.nativecerts} category.
      * </p>
@@ -30,12 +29,7 @@ public class NativeTrustedCertificates {
             }
 
             if (isMac) {
-                List<X509Certificate> admin = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.admin);
-                List<X509Certificate> user = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-
-                Set<X509Certificate> result = new HashSet<>(admin);
-                result.addAll(user);
-                return result;
+                return KeyChainStore.getAllTrustedCertificates();
             }
 
             if (isWindows) {

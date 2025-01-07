@@ -60,9 +60,9 @@ public class Crypt32ExtUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
-        assertEquals("a2133a948547091abc0e0f62aa27bb1927b03f10", sha1);
+        assertEquals("c64a34966d69b4bed3caa374998a5066ede0f898", sha1);
         //noinspection SpellCheckingInspection
-        assertEquals("d5976cf01a27686e61c1ab79907ceed01a9d74a5c7495aad617a7df88fbec204", sha256);
+        assertEquals("947565b3b4b08c936f0ad5b306062418c61cd2600e109cfdee8318ca69cca16e", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(sha1);
