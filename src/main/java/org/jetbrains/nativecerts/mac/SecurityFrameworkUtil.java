@@ -68,7 +68,13 @@ public class SecurityFrameworkUtil {
 
             for (int i = 0; i < certArray.getCount(); i++) {
                 SecurityFramework.SecCertificateRef secCertificateRef = new SecurityFramework.SecCertificateRef(certArray.getValueAtIndex(i));
-                if (!predicate.test(secCertificateRef)) {
+                try {
+                    if (!predicate.test(secCertificateRef)) {
+                        continue;
+                    }
+                } catch (Throwable predicateError) {
+                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                    LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
                     continue;
                 }
 
@@ -118,18 +124,19 @@ public class SecurityFrameworkUtil {
         CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
         SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
 
+        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
+
         CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
         if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc) || trustedSettingsArray == null) {
             // No trust record => do not trust
+            LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings");
             return false;
         }
-
-        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
 
         if (LOGGER.isLoggable(Level.FINE)) {
             try {
                 CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
-                LOGGER.fine("Certificate '" + certificateDescription + "' trusted settings:\n" + cfStringRef.stringValue());
+                LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
             } catch (Throwable t) {
                 LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
             }
