@@ -99,7 +99,6 @@ public class SecurityFrameworkUtilTest {
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
         assertEquals("a2133a948547091abc0e0f62aa27bb1927b03f10", sha1);
-        //noinspection SpellCheckingInspection
         assertEquals("d5976cf01a27686e61c1ab79907ceed01a9d74a5c7495aad617a7df88fbec204", sha256);
 
         // cleanup just in case it was imported before

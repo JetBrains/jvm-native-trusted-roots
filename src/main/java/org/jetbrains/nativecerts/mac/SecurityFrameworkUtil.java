@@ -156,7 +156,7 @@ public class SecurityFrameworkUtil {
 
                 // kSecTrustSettingsResult
                 {
-                    Pointer value = constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsResult);
+                    Pointer value = constraints.getValue(SecurityFramework.kSecTrustSettingsResult);
 
                     // from https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
                     // If this key is not present, a default value of kSecTrustSettingsResultTrustRoot is assumed. Because only a root certificate can have this value, a usage constraints dictionary for a non-root certificate that is missing this key is not valid.
@@ -188,7 +188,7 @@ public class SecurityFrameworkUtil {
                     // Skip kSecTrustSettingsAllowedError processing
                     // Documentation says "A number which, if encountered during certificate verification, is ignored for that certificate."
                     // We would not ignore anything, so skip for now
-                    if (constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsAllowedError) != null) {
+                    if (constraints.getValue(SecurityFramework.kSecTrustSettingsAllowedError) != null) {
                         processedConstrains++;
                     }
                 }
@@ -196,14 +196,14 @@ public class SecurityFrameworkUtil {
                 // kSecTrustSettingsPolicyName
                 {
                     // Skip kSecTrustSettingsPolicyName, it does not matter for processing
-                    if (constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsPolicyName) != null) {
+                    if (constraints.getValue(SecurityFramework.kSecTrustSettingsPolicyName) != null) {
                         processedConstrains++;
                     }
                 }
 
                 // kSecTrustSettingsPolicy
                 {
-                    Pointer value = constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsPolicy);
+                    Pointer value = constraints.getValue(SecurityFramework.kSecTrustSettingsPolicy);
                     if (value != null) {
                         SecurityFramework.SecPolicyRef secPolicyRef = new SecurityFramework.SecPolicyRef(value);
 
