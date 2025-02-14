@@ -29,7 +29,7 @@ public class NativeCertsTestUtil {
     }
 
     public static Path getTestCertificatePath() {
-        String fileName = "/certificates-tests.labs.intellij.net.cer";
+        String fileName = "/mock-ca/root.cer";
         try {
             Path path = Path.of(Objects.requireNonNull(NativeCertsTestUtil.class.getResource(fileName)).toURI());
             if (!Files.isRegularFile(path)) {
