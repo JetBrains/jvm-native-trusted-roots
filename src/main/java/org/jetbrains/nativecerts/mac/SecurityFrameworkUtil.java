@@ -32,14 +32,12 @@ public class SecurityFrameworkUtil {
                 createCFString("kSecClass"),
                 createCFString("kSecMatchLimit"),
                 createCFString("kSecReturnRef"),
-                createCFString("kSecMatchSearchList")
         };
 
         CoreFoundation.CFTypeRef[] searchValues = {
                 createCFString("kSecClassCertificate"),
                 createCFString("kSecMatchLimitAll"),
                 createCFString("kCFBooleanTrue"),
-                createCFString("keychainList")
         };
 
         CoreFoundation.CFAllocatorRef alloc = CoreFoundation.INSTANCE.CFAllocatorGetDefault();
@@ -185,7 +183,7 @@ public class SecurityFrameworkUtil {
 
         CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
         SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
-        
+
         CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
         if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
             // No trust record found => do not trust
