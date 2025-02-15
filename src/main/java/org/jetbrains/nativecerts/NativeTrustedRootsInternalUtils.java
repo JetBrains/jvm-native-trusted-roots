@@ -101,6 +101,6 @@ public class NativeTrustedRootsInternalUtils {
     }
 
     private static class BouncyCastleLazyProvider {
-        public static BouncyCastleProvider INSTANCE = new BouncyCastleProvider();
+        public static final BouncyCastleProvider INSTANCE = new BouncyCastleProvider();
     }
 }

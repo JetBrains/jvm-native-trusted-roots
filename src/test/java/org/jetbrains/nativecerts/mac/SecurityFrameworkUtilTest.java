@@ -115,9 +115,8 @@ public class SecurityFrameworkUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
-        assertEquals("a2133a948547091abc0e0f62aa27bb1927b03f10", sha1);
-        //noinspection SpellCheckingInspection
-        assertEquals("d5976cf01a27686e61c1ab79907ceed01a9d74a5c7495aad617a7df88fbec204", sha256);
+        assertEquals("1e4d664b61b49dd8bbd16e28e3abd7c6655aefa8", sha1);
+        assertEquals("f759db7e486bf13f39e70f481f57cc335ad3111c8f3b3a5cb6d4de363d7dd5db", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
@@ -141,7 +140,7 @@ public class SecurityFrameworkUtilTest {
             Assert.assertEquals(shouldTrust, verifyCert(getTestCertificatePath(), policy));
 
             String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
-            Assert.assertTrue(trustSettings, trustSettings.contains("certificates-tests.labs.intellij.net"));
+            Assert.assertTrue(trustSettings, trustSettings.contains("JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA"));
 
             List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
             assertEquals(shouldTrust, rootsAfter.contains(getTestCertificate()));

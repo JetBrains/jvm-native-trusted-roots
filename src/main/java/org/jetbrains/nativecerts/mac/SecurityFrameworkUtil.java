@@ -101,7 +101,13 @@ public class SecurityFrameworkUtil {
 
             for (int i = 0; i < certArray.getCount(); i++) {
                 SecurityFramework.SecCertificateRef secCertificateRef = new SecurityFramework.SecCertificateRef(certArray.getValueAtIndex(i));
-                if (!predicate.test(secCertificateRef)) {
+                try {
+                    if (!predicate.test(secCertificateRef)) {
+                        continue;
+                    }
+                } catch (Throwable predicateError) {
+                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                    LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
                     continue;
                 }
 
@@ -179,7 +185,7 @@ public class SecurityFrameworkUtil {
 
         CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
         SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
-
+        
         CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
         if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
             // No trust record found => do not trust
@@ -196,10 +202,16 @@ public class SecurityFrameworkUtil {
 
         String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
 
+        if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc) || trustedSettingsArray == null) {
+            // No trust record => do not trust
+            LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings");
+            return false;
+        }
+
         if (LOGGER.isLoggable(Level.FINE)) {
             try {
                 CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
-                LOGGER.fine("Certificate '" + certificateDescription + "' trusted settings:\n" + cfStringRef.stringValue());
+                LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
             } catch (Throwable t) {
                 LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
             }
@@ -219,7 +231,7 @@ public class SecurityFrameworkUtil {
 
                 // kSecTrustSettingsResult
                 {
-                    Pointer value = constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsResult);
+                    Pointer value = constraints.getValue(SecurityFramework.kSecTrustSettingsResult);
 
                     // from https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
                     // If this key is not present, a default value of kSecTrustSettingsResultTrustRoot is assumed. Because only a root certificate can have this value, a usage constraints dictionary for a non-root certificate that is missing this key is not valid.
@@ -251,7 +263,7 @@ public class SecurityFrameworkUtil {
                     // Skip kSecTrustSettingsAllowedError processing
                     // Documentation says "A number which, if encountered during certificate verification, is ignored for that certificate."
                     // We would not ignore anything, so skip for now
-                    if (constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsAllowedError) != null) {
+                    if (constraints.getValue(SecurityFramework.kSecTrustSettingsAllowedError) != null) {
                         processedConstrains++;
                     }
                 }
@@ -259,14 +271,14 @@ public class SecurityFrameworkUtil {
                 // kSecTrustSettingsPolicyName
                 {
                     // Skip kSecTrustSettingsPolicyName, it does not matter for processing
-                    if (constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsPolicyName) != null) {
+                    if (constraints.getValue(SecurityFramework.kSecTrustSettingsPolicyName) != null) {
                         processedConstrains++;
                     }
                 }
 
                 // kSecTrustSettingsPolicy
                 {
-                    Pointer value = constraints.getValue(SecurityFramework.INSTANCE.kSecTrustSettingsPolicy);
+                    Pointer value = constraints.getValue(SecurityFramework.kSecTrustSettingsPolicy);
                     if (value != null) {
                         SecurityFramework.SecPolicyRef secPolicyRef = new SecurityFramework.SecPolicyRef(value);
 
