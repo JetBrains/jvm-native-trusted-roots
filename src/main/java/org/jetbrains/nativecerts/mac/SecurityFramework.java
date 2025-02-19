@@ -11,6 +11,12 @@ public interface SecurityFramework extends Library {
 
     SecurityFramework INSTANCE = Native.load("Security", SecurityFramework.class);
 
+    CoreFoundation.CFStringRef kSecClass = resolveSecurityFrameworkString("kSecClass");
+    CoreFoundation.CFStringRef kSecMatchLimit = resolveSecurityFrameworkString("kSecMatchLimit");
+    CoreFoundation.CFStringRef kSecMatchLimitAll = resolveSecurityFrameworkString("kSecMatchLimitAll");
+    CoreFoundation.CFStringRef kSecReturnRef = resolveSecurityFrameworkString("kSecReturnRef");
+    CoreFoundation.CFStringRef kSecClassCertificate = resolveSecurityFrameworkString("kSecClassCertificate");
+
     /**
      * Returns a string explaining the meaning of a security result code.
      *
@@ -47,6 +53,10 @@ public interface SecurityFramework extends Library {
     @NotNull
     OSStatus SecTrustSettingsCopyCertificates(@NotNull SecTrustSettingsDomain domain, @NotNull CFArrayRefByReference certArray);
 
+    /**
+     * Returns one or more keychain items that match a search query, or copies attributes of specific keychain items.
+     * @see <a href="https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)">https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)</a>
+     */
     @NotNull
     OSStatus SecItemCopyMatching(@NotNull CoreFoundation.CFDictionaryRef query, CFArrayRefByReference result);
 
@@ -377,5 +387,10 @@ public interface SecurityFramework extends Library {
         public SecTrustSettingsDomain(long value) {
             super(value);
         }
+    }
+
+    private static CoreFoundation.CFStringRef resolveSecurityFrameworkString(String name) {
+        Pointer pointer = Native.getNativeLibrary(SecurityFramework.INSTANCE).getGlobalVariableAddress(name);
+        return new CoreFoundation.CFStringRef(pointer.getPointer(0));
     }
 }
