@@ -17,14 +17,33 @@ public interface CoreFoundationExt extends Library {
      */
     CoreFoundation.CFIndex CFDictionaryGetCount(CoreFoundation.CFDictionaryRef theDict);
 
+    /**
+     * Creates an immutable dictionary containing the specified key-value pairs.
+     *
+     * @see <a href="https://developer.apple.com/documentation/corefoundation/1516782-cfdictionarycreate">https://developer.apple.com/documentation/corefoundation/1516782-cfdictionarycreate</a>
+     * @return A new dictionary, or NULL if there was a problem creating the object.
+     * Ownership follows the <a href="https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html">Create Rule</a>.
+     */
     CoreFoundation.CFDictionaryRef CFDictionaryCreate(
-            CoreFoundation.CFAllocatorRef alloc,
-            CoreFoundation.CFTypeRef[] searchKeys,
-            CoreFoundation.CFTypeRef[] searchValues,
-            CoreFoundation.CFIndex capacity,
+            CoreFoundation.CFAllocatorRef allocator,
+            CoreFoundation.CFTypeRef[] keys,
+            CoreFoundation.CFTypeRef[] values,
+            CoreFoundation.CFIndex numValues,
             Pointer keyCallBacks,
             Pointer valueCallBacks
     );
 
     boolean CFEqual(CoreFoundation.CFTypeRef cf1, CoreFoundation.CFTypeRef cf2);
+
+    CoreFoundation.CFBooleanRef kCFBooleanFalse = resolveBoolean("kCFBooleanFalse", false);
+    CoreFoundation.CFBooleanRef kCFBooleanTrue = resolveBoolean("kCFBooleanTrue", true);
+
+    private static CoreFoundation.CFBooleanRef resolveBoolean(String name, boolean expectedValue) {
+        Pointer pointer = Native.getNativeLibrary(CoreFoundation.INSTANCE).getGlobalVariableAddress(name);
+        CoreFoundation.CFBooleanRef cfBoolean = new CoreFoundation.CFBooleanRef(pointer.getPointer(0));
+        if (cfBoolean.booleanValue() != expectedValue) {
+            throw new IllegalStateException("Expected " + name + " to be " + expectedValue + ", but got " + cfBoolean.booleanValue());
+        }
+        return cfBoolean;
+    }
 }

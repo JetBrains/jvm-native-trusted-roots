@@ -16,7 +16,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -94,7 +93,7 @@ public class SecurityFrameworkUtilTest {
     }
 
     @Test
-    public void verifyCert() throws Exception {
+    public void verifyCert() {
         List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
 
         List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectDN().toString())
