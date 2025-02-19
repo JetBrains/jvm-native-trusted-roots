@@ -77,9 +77,11 @@ public interface SecurityFramework extends Library {
 
     CoreFoundation.CFTypeID SecCertificateGetTypeID();
     CoreFoundation.CFTypeID SecPolicyGetTypeID();
+    CoreFoundation.CFTypeID SecTrustGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
     CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
+    CoreFoundation.CFTypeID SEC_TRUST_TYPE_ID = INSTANCE.SecTrustGetTypeID();
 
     /**
      * An abstract Core Foundation-type object representing an X.509 certificate.
@@ -126,7 +128,7 @@ public interface SecurityFramework extends Library {
 
         public SecTrustRef(Pointer p) {
             super(p);
-            if (!isTypeID(SEC_POLICY_TYPE_ID)) {
+            if (!isTypeID(SEC_TRUST_TYPE_ID)) {
                 throw new ClassCastException("Unable to cast to SecTrustRef. Type ID: " + getTypeID());
             }
         }
