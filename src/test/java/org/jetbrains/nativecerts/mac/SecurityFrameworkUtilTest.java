@@ -96,7 +96,7 @@ public class SecurityFrameworkUtilTest {
     public void verifyCert() {
         List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
 
-        List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectDN().toString())
+        List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectX500Principal().toString())
                 .collect(Collectors.toList());
         assertThat(aliases, hasItem("CN=TIMJA-ROOT, O=TIMJA, ST=ES, C=UK"));
         assertThat(aliases.size(), is(greaterThan(1)));

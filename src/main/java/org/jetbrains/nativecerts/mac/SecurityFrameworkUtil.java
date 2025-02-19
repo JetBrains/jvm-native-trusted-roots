@@ -159,9 +159,8 @@ public class SecurityFrameworkUtil {
         String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
 
         CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
-        if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
-            // No trust record found => do not trust
-            LOGGER.fine("Certificate '" + certificateDescription + "' has no trust record");
+        if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc) && !SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
+            LOGGER.fine("Failed to get trust settings for certificate '" + certificateDescription + "': " + rc);
             return false;
         }
 
