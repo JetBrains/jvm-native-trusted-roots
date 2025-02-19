@@ -33,6 +33,8 @@ public interface CoreFoundationExt extends Library {
             Pointer valueCallBacks
     );
 
+    CoreFoundation.CFArrayRef CFArrayCreate(CoreFoundation.CFAllocatorRef alloc, Pointer[] values, CoreFoundation.CFIndex numValues, Pointer callBacks);
+
     boolean CFEqual(CoreFoundation.CFTypeRef cf1, CoreFoundation.CFTypeRef cf2);
 
     CoreFoundation.CFBooleanRef kCFBooleanFalse = resolveBoolean("kCFBooleanFalse", false);
