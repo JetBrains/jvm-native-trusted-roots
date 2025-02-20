@@ -187,13 +187,15 @@ public interface SecurityFramework extends Library {
     }
 
     /**
-     * Returns a policy object for the default X.509 policy.
+     * Returns a policy object for evaluating SSL certificate chains.
      *
-     * @see <a href="https://developer.apple.com/documentation/security/secpolicycreatebasicx509()">https://developer.apple.com/documentation/security/secpolicycreatebasicx509()</a>
+     * @see <a href="https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)">https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)</a>
      *
+     * @param server Specify true on the client side to return a policy for SSL server certificates.
+     * @param hostname If you specify a value for this parameter, the policy will require the specified value to match the host name in the leaf certificate.
      * @return The policy object. In Objective-C, call the CFRelease function to release the object when you are finished with it.
      */
-    SecTrustRef SecPolicyCreateBasicX509();
+    SecPolicyRef SecPolicyCreateSSL(boolean server, CoreFoundation.CFStringRef hostname);
 
     /**
      * Returns a dictionary containing a policy’s properties.
@@ -298,7 +300,7 @@ public interface SecurityFramework extends Library {
      * @param trust On return, points to the newly created trust management object. In Objective-C, call the CFRelease function to release this object when you are finished with it.
      * @return A result code. See <a href="https://developer.apple.com/documentation/security/security-framework-result-codes">Security Framework Result Codes</a>.
      */
-    OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecTrustRef policies, SecTrustRefByReference trust);
+    OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecPolicyRef policies, SecTrustRefByReference trust);
 
     /**
      * Evaluates trust for the specified certificate and policies.

@@ -126,7 +126,7 @@ public class SecurityFrameworkUtil {
     }
 
     private static boolean validateCertificate(SecurityFramework.SecCertificateRef certificateRef) {
-        SecurityFramework.SecTrustRef policy = null;
+        SecurityFramework.SecPolicyRef policy = null;
         try {
             final Pointer[] values = {certificateRef.getPointer()};
             CoreFoundation.CFArrayRef subjCerts = CoreFoundationExt.INSTANCE.CFArrayCreate(
@@ -135,7 +135,7 @@ public class SecurityFrameworkUtil {
 
             SecurityFramework.SecTrustRefByReference secTrustRefByReference = new SecurityFramework.SecTrustRefByReference();
 
-            policy = SecurityFramework.INSTANCE.SecPolicyCreateBasicX509();
+            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(false, null);
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
                     subjCerts, policy, secTrustRefByReference);
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
@@ -143,8 +143,7 @@ public class SecurityFrameworkUtil {
                 return false;
             }
 
-            boolean result = SecurityFramework.INSTANCE.SecTrustEvaluateWithError(secTrustRefByReference.getSecTrustRef(), null);
-            return result;
+            return SecurityFramework.INSTANCE.SecTrustEvaluateWithError(secTrustRefByReference.getSecTrustRef(), null);
 
         } finally {
             if (policy != null) {
