@@ -11,10 +11,35 @@ public interface SecurityFramework extends Library {
 
     SecurityFramework INSTANCE = Native.load("Security", SecurityFramework.class);
 
+    /**
+     * A dictionary key whose value is the item’s class.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksecclass">https://developer.apple.com/documentation/security/ksecclass</a>
+     */
     CoreFoundation.CFStringRef kSecClass = resolveSecurityFrameworkString("kSecClass");
+    /**
+     * A key whose value indicates the match limit.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimit">https://developer.apple.com/documentation/security/kSecMatchLimit</a>
+     */
     CoreFoundation.CFStringRef kSecMatchLimit = resolveSecurityFrameworkString("kSecMatchLimit");
+    /**
+     * A value that corresponds to matching an unlimited number of items.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimitAll">https://developer.apple.com/documentation/security/kSecMatchLimitAll</a>
+     */
     CoreFoundation.CFStringRef kSecMatchLimitAll = resolveSecurityFrameworkString("kSecMatchLimitAll");
+    /**
+     * A key whose value is a Boolean indicating whether or not to return a reference to an item.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecReturnRef">https://developer.apple.com/documentation/security/kSecReturnRef</a>
+     */
     CoreFoundation.CFStringRef kSecReturnRef = resolveSecurityFrameworkString("kSecReturnRef");
+    /**
+     * The value that indicates a certificate item.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecClassCertificate">https://developer.apple.com/documentation/security/kSecClassCertificate</a>
+     */
     CoreFoundation.CFStringRef kSecClassCertificate = resolveSecurityFrameworkString("kSecClassCertificate");
 
     /**
@@ -77,6 +102,14 @@ public interface SecurityFramework extends Library {
 
     CoreFoundation.CFTypeID SecCertificateGetTypeID();
     CoreFoundation.CFTypeID SecPolicyGetTypeID();
+
+    /**
+     * Returns the unique identifier of the opaque type to which a trust object belongs
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrustgettypeid()">https://developer.apple.com/documentation/security/sectrustgettypeid()</a>
+     *
+     * @return A value that identifies the opaque type of a SecTrustRef object.
+     */
     CoreFoundation.CFTypeID SecTrustGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
@@ -153,6 +186,13 @@ public interface SecurityFramework extends Library {
         }
     }
 
+    /**
+     * Returns a policy object for the default X.509 policy.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/secpolicycreatebasicx509()">https://developer.apple.com/documentation/security/secpolicycreatebasicx509()</a>
+     *
+     * @return The policy object. In Objective-C, call the CFRelease function to release the object when you are finished with it.
+     */
     SecTrustRef SecPolicyCreateBasicX509();
 
     /**
@@ -248,8 +288,24 @@ public interface SecurityFramework extends Library {
      */
     OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain, CFArrayRefByReference trustSettings);
 
+    /**
+     * Creates a trust management object based on certificates and policies.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)">https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)</a>
+     *
+     * @param certificates The certificate to be verified, plus any other certificates you think might be useful for verifying the certificate. The certificate to be verified must be the first in the array. If you want to specify only one certificate, you can pass a SecCertificateRef object; otherwise, pass an array of SecCertificateRef objects.
+     * @param policies References to one or more policies to be evaluated. You can pass a single SecPolicyRef object, or an array of one or more SecPolicyRef objects. If you pass in multiple policies, all policies must verify for the certificate chain to be considered valid. You typically use one of the standard policies, like the one returned by SecPolicyCreateBasicX509.
+     * @param trust On return, points to the newly created trust management object. In Objective-C, call the CFRelease function to release this object when you are finished with it.
+     * @return A result code. See <a href="https://developer.apple.com/documentation/security/security-framework-result-codes">Security Framework Result Codes</a>.
+     */
     OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecTrustRef policies, SecTrustRefByReference trust);
 
+    /**
+     * Evaluates trust for the specified certificate and policies.
+     * @param trust The trust management object to evaluate. A trust management object includes the certificate to be verified plus the policy or policies to be used in evaluating trust. It can optionally also include other certificates to be used in verifying the first certificate. Use the SecTrustCreateWithCertificates function to create a trust management object.
+     * @param error An error pointer the method uses to return an error when trust evaluation fails. Set to nil to ignore the error.
+     * @return true if the certificate is trusted; otherwise, false.
+     */
     boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
     /**
      * Trust settings returned in usage constraints dictionaries.
