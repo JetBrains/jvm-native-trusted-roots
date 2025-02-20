@@ -25,6 +25,7 @@ import static org.jetbrains.nativecerts.NativeCertsTestUtil.combineLists;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessAndGetExitCode;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStdout;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.getCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
@@ -55,7 +56,7 @@ public class SecurityFrameworkUtilTest {
 
         System.out.println(trustedRoots.size());
         for (X509Certificate root : trustedRoots) {
-            System.out.println(root.getSubjectDN().toString());
+            System.out.println(root.getSubjectX500Principal().toString());
         }
 
         Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
@@ -63,12 +64,12 @@ public class SecurityFrameworkUtilTest {
         Assert.assertTrue(
                 "Expected some roots from 'Google Trust Services LLC'",
                 trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
+                        crt.getSubjectX500Principal().toString().contains("Google Trust Services LLC"))
         );
         Assert.assertTrue(
                 "Expected some roots from 'VeriSign'",
                 trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("VeriSign"))
+                        crt.getSubjectX500Principal().toString().contains("VeriSign"))
         );
     }
 
@@ -93,14 +94,51 @@ public class SecurityFrameworkUtilTest {
     }
 
     @Test
-    public void verifyCert() {
-        List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+    public void supportForIntermediateCertificates() throws InterruptedException {
+        Assume.assumeTrue(isManualTestingEnabled);
 
-        List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectX500Principal().toString())
-                .collect(Collectors.toList());
-        assertThat(aliases, hasItem("CN=TIMJA-ROOT, O=TIMJA, ST=ES, C=UK"));
-        assertThat(aliases.size(), is(greaterThan(1)));
-        assertThat(aliases, hasItem("CN=TIMJA-INTERMEDIATE, O=TIMJA, ST=ES, C=UK"));
+        // add root cert
+        try {
+            Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
+            List<String> args = List.of(
+                    "/usr/bin/security",
+                    "add-trusted-cert",
+                    "-k", loginKeyChain.toString(),
+                    getTestCertificatePath().toString()
+            );
+            executeProcess(args);
+
+            Thread.sleep(2000L);
+
+            // add intermediate cert
+            args = List.of(
+                    "/usr/bin/security",
+                    "add-certificates",
+                    "-k", loginKeyChain.toString(),
+                    getCertificatePath("/mock-ca/intermediate-ca.pem").toString()
+            );
+            executeProcess(args);
+
+            // verify certs are trusted
+            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+
+            List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectX500Principal().toString())
+                    .collect(Collectors.toList());
+            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
+            assertThat(aliases.size(), is(greaterThan(1)));
+            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
+        } finally {
+            removeTrustedCert(getTestCertificatePath());
+
+            executeProcess(
+                    List.of(
+                            "/usr/bin/security",
+                            "delete-certificate",
+                            "-c", "JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA",
+                            "-t"
+                    )
+            );
+        }
     }
 
     /**
