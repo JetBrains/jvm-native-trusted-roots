@@ -28,28 +28,36 @@ public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
     public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) {
-        CoreFoundation.CFDictionaryRef query = CoreFoundationExtUtil.createDictionary(
-                Map.of(
-                        SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
-                        SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
-                        SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll
-                )
-        );
+        CoreFoundation.CFDictionaryRef query = null;
 
-        List<X509Certificate> result = copyMatchingCertificates(query, cert -> isTrustedRoot(domain, cert));
+        try {
+            query = CoreFoundationExtUtil.createDictionary(
+                    Map.of(
+                            SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
+                            SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
+                            SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll
+                    )
+            );
 
-        if (LOGGER.isLoggable(Level.FINE)) {
-            StringBuilder message = new StringBuilder();
-            message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
+            List<X509Certificate> result = copyMatchingCertificates(query, cert -> isTrustedRoot(domain, cert));
 
-            for (X509Certificate certificate : result) {
-                message.append("\n  ").append(certificate.getSubjectX500Principal());
+            if (LOGGER.isLoggable(Level.FINE)) {
+                StringBuilder message = new StringBuilder();
+                message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
+
+                for (X509Certificate certificate : result) {
+                    message.append("\n  ").append(certificate.getSubjectX500Principal());
+                }
+
+                LOGGER.fine(message.toString());
             }
 
-            LOGGER.fine(message.toString());
+            return result;
+        } finally {
+            if (query != null) {
+                query.release();
+            }
         }
-
-        return result;
     }
 
     @NotNull
@@ -164,39 +172,41 @@ public class SecurityFrameworkUtil {
 
     public static boolean isTrustedRoot(SecurityFramework.SecTrustSettingsDomain domain, SecurityFramework.SecCertificateRef certificateRef) {
         boolean selfSignedCertificate = isSelfSignedCertificate(getX509Certificate(certificateRef));
-
         CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
-        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
-
-        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
-
-        CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
-        if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc) && !SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
-            LOGGER.fine("Failed to get trust settings for certificate '" + certificateDescription + "': " + rc);
-            return false;
-        }
-
-        if (trustedSettingsArray == null) {
-            // Trust record is null we need to verify the certificate first
-            boolean valid = validateCertificate(certificateRef);
-            if (valid) {
-                return true;
-            } else {
-                LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings and failed to validate against trusted roots");
-                return false;
-            }
-        }
-
-        if (LOGGER.isLoggable(Level.FINE)) {
-            try {
-                CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
-                LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
-            } catch (Throwable t) {
-                LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
-            }
-        }
+        CoreFoundation.CFStringRef descriptionRef = null;
 
         try {
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
+
+            descriptionRef = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef);
+            String certificateDescription = descriptionRef.stringValue();
+
+            CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc) && !SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
+                LOGGER.fine("Failed to get trust settings for certificate '" + certificateDescription + "': " + rc);
+                return false;
+            }
+
+            if (trustedSettingsArray == null) {
+                // Trust record is null we need to verify the certificate first
+                boolean valid = validateCertificate(certificateRef);
+                if (valid) {
+                    return true;
+                } else {
+                    LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings and failed to validate against trusted roots");
+                    return false;
+                }
+            }
+
+            if (LOGGER.isLoggable(Level.FINE)) {
+                try {
+                    CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
+                    LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
+                } catch (Throwable t) {
+                    LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
+                }
+            }
+
             if (trustedSettingsArray.getCount() == 0) {
                 // https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
                 // An empty trust settings array (that is, the trustSettings parameter returns a valid but empty CFArray) means "always trust this certificate" with an overall trust setting for the certificate of kSecTrustSettingsResultTrustRoot
@@ -293,7 +303,13 @@ public class SecurityFrameworkUtil {
             // No matched constraints => not a trusted root
             return false;
         } finally {
-            trustedSettingsArray.release();
+            if (descriptionRef != null) {
+                descriptionRef.release();
+            }
+            CoreFoundation.CFArrayRef array = trustedSettingsRef.getArray();
+            if (array != null) {
+                array.release();
+            }
         }
     }
 }
