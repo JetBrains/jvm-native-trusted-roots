@@ -15,6 +15,7 @@ import java.util.List;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.ExitCodeHandling;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStdout;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.getCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
@@ -88,6 +89,61 @@ public class Crypt32ExtUtilTest {
         } finally {
             // always clean-up
             removeTrustedCert(sha1);
+        }
+    }
+
+    @Test
+    public void intermediateCACertsAreIncluded() throws Exception {
+        Assume.assumeTrue(isManualTestingEnabled);
+
+        X509Certificate rootCertificate = getTestCertificate();
+        byte[] rootEncoded = rootCertificate.getEncoded();
+        String sha1Root = sha1hex(rootEncoded);
+
+        String intermediateCertResourcePath = "/mock-ca/intermediate-ca.pem";
+        X509Certificate intermediateCertificate = getTestCertificate(intermediateCertResourcePath);
+        byte[] intermediateEncoded = intermediateCertificate.getEncoded();
+        String sha1Intermediate = sha1hex(intermediateEncoded);
+
+        // cleanup just in case it was imported before
+        removeTrustedCert(sha1Root);
+        removeTrustedCert(sha1Intermediate);
+
+        try {
+            Collection<X509Certificate> rootsBefore = Crypt32ExtUtil.getCustomTrustedRootCertificates();
+            assertFalse(rootsBefore.contains(rootCertificate));
+
+            Assert.assertFalse(verifyCert(sha1Root));
+
+            executeProcess(
+                    List.of("certutil", "-user", "-addstore", "Root", getTestCertificatePath().toString())
+            );
+            assertTrue(verifyCert(sha1Root));
+
+            String intermediateCertPath = getCertificatePath(intermediateCertResourcePath).toString();
+            executeProcess(
+                    List.of("certutil", "-user", "-addstore", "CA", intermediateCertPath)
+            );
+            assertTrue(verifyCert(intermediateCertPath));
+
+
+            Collection<X509Certificate> rootsAfter = Crypt32ExtUtil.getCustomTrustedRootCertificates();
+            assertTrue(rootsAfter.contains(rootCertificate));
+            assertTrue(rootsAfter.contains(intermediateCertificate));
+
+            assertTrue(removeTrustedCert(sha1Root));
+            Assert.assertFalse(verifyCert(sha1Root));
+
+            assertTrue(removeTrustedCert(sha1Intermediate));
+            Assert.assertFalse(verifyCert(sha1Intermediate));
+
+            Collection<X509Certificate> rootsAfterRemoval = Crypt32ExtUtil.getCustomTrustedRootCertificates();
+            assertFalse(rootsAfterRemoval.contains(rootCertificate));
+            assertFalse(rootsAfterRemoval.contains(intermediateCertificate));
+        } finally {
+            // always clean-up
+            removeTrustedCert(sha1Root);
+            removeTrustedCert(sha1Intermediate);
         }
     }
 

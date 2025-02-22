@@ -30,8 +30,12 @@ public class NativeCertsTestUtil {
 
     public static Path getTestCertificatePath() {
         String fileName = "/mock-ca/root.cer";
+        return getCertificatePath(fileName);
+    }
+
+    public static @NotNull Path getCertificatePath(String certName) {
         try {
-            Path path = Path.of(Objects.requireNonNull(NativeCertsTestUtil.class.getResource(fileName)).toURI());
+            Path path = Path.of(Objects.requireNonNull(NativeCertsTestUtil.class.getResource(certName)).toURI());
             if (!Files.isRegularFile(path)) {
                 throw new IllegalStateException("Path not found: " + path);
             }
@@ -44,6 +48,15 @@ public class NativeCertsTestUtil {
     public static X509Certificate getTestCertificate() {
         try {
             byte[] bytes = Files.readAllBytes(getTestCertificatePath());
+            return NativeTrustedRootsInternalUtils.parseCertificate(bytes);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static X509Certificate getTestCertificate(String certificateName) {
+        try {
+            byte[] bytes = Files.readAllBytes(getCertificatePath(certificateName));
             return NativeTrustedRootsInternalUtils.parseCertificate(bytes);
         } catch (Exception e) {
             throw new RuntimeException(e);
