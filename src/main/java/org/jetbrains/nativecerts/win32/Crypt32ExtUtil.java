@@ -39,20 +39,26 @@ public class Crypt32ExtUtil {
         HashSet<X509Certificate> result = new HashSet<>();
 
         for (Map.Entry<String, Integer> entry : customTrustedCertificatesLocations.entrySet()) {
-            List<X509Certificate> list = gatherEnterpriseCertsForLocation(entry.getValue(), "ROOT");
+            List<X509Certificate> root = gatherEnterpriseCertsForLocation(entry.getValue(), "ROOT");
+            List<X509Certificate> intermediates = gatherEnterpriseCertsForLocation(entry.getValue(), "CA");
 
             if (LOGGER.isLoggable(Level.FINE)) {
                 StringBuilder message = new StringBuilder();
-                message.append("Received ").append(list.size()).append(" certificates from store ROOT / ").append(entry.getKey());
+                message.append("Received ").append(root.size()).append(" certificates from store ROOT / ").append(entry.getKey());
+                message.append("Received ").append(intermediates.size()).append(" certificates from store CA (Intermediates) / ").append(entry.getKey());
 
-                for (X509Certificate certificate : list) {
-                    message.append("\n  ROOT/").append(entry.getKey()).append(": ").append(certificate.getSubjectDN());
+                for (X509Certificate certificate : root) {
+                    message.append("\n  ROOT/").append(entry.getKey()).append(": ").append(certificate.getSubjectX500Principal());
+                }
+                for (X509Certificate certificate : intermediates) {
+                    message.append("\n  CA/").append(entry.getKey()).append(": ").append(certificate.getSubjectX500Principal());
                 }
 
                 LOGGER.fine(message.toString());
             }
 
-            result.addAll(list);
+            result.addAll(root);
+            result.addAll(intermediates);
         }
 
         return result;
