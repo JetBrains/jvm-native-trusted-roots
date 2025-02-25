@@ -98,8 +98,8 @@ public class SecurityFrameworkUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
-        assertEquals("1e4d664b61b49dd8bbd16e28e3abd7c6655aefa8", sha1);
-        assertEquals("f759db7e486bf13f39e70f481f57cc335ad3111c8f3b3a5cb6d4de363d7dd5db", sha256);
+        assertEquals("92b4346a0374146363051de508ee00fff9e88ee9", sha1);
+        assertEquals("1884200d0201b40229ffb0607c05d9a87c2d4fd61968639c11e972ac3ef2c95d", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
