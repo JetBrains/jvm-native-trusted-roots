@@ -52,38 +52,32 @@ public class SecurityFrameworkUtil {
         CFArrayRefByReference returnedCertArray = new CFArrayRefByReference();
         CFArrayRefByReference searchDomainArray = new CFArrayRefByReference();
         SecurityFramework.SecKeychainRefByReference keychain = new SecurityFramework.SecKeychainRefByReference();
-        CoreFoundation.CFArrayRef keychainArr = null;
+        CoreFoundation.CFArrayRef searchDomainList = null;
+        CoreFoundation.CFArrayRef certArray = null;
 
         boolean systemDomain = domain.equals(SecurityFramework.SecTrustSettingsDomain.system);
-        CoreFoundation.CFDictionaryRef query;
-        if (systemDomain) {
+        CoreFoundation.CFDictionaryRef query = null;
+        try {
+            if (systemDomain) {
+                // `SecKeychainCopyDomainSearchList` doesn't return the keychain for the system domain
                 SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainOpen("/System/Library/Keychains/SystemRootCertificates.keychain", keychain);
                 if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
                     throw new IllegalStateException("Failed to read system keychain: " + rc);
                 }
 
-                keychainArr = CoreFoundation.INSTANCE.CFArrayCreate(
+                searchDomainList = CoreFoundation.INSTANCE.CFArrayCreate(
                         null, keychain.getPointer(), new CoreFoundation.CFIndex(1), null
                 );
-
-                query = CoreFoundationExtUtil.createDictionary(
-                        Map.of(
-                                SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
-                                SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll,
-                                SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
-                                SecurityFramework.kSecMatchSearchList, keychainArr
-                        )
-                );
-        } else {
-            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainCopyDomainSearchList(domain, searchDomainArray);
-            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
-                throw new IllegalStateException("SecKeychainCopyDomainSearchList failed: " + rc);
+            } else {
+                SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainCopyDomainSearchList(domain, searchDomainArray);
+                if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                    throw new IllegalStateException("SecKeychainCopyDomainSearchList failed: " + rc);
+                }
+                searchDomainList = searchDomainArray.getArray();
             }
-            CoreFoundation.CFArrayRef searchDomainList = searchDomainArray.getArray();
             if (searchDomainList == null) {
                 throw new IllegalStateException("Unexpected null search domain list");
             }
-
             query = CoreFoundationExtUtil.createDictionary(
                     Map.of(
                             SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
@@ -92,21 +86,18 @@ public class SecurityFrameworkUtil {
                             SecurityFramework.kSecMatchSearchList, searchDomainList
                     )
             );
-        }
 
-        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecItemCopyMatching(query, returnedCertArray);
-        query.release();
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecItemCopyMatching(query, returnedCertArray);
 
-        if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
-            throw new IllegalStateException("SecItemCopyMatching failed: " + rc);
-        }
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                throw new IllegalStateException("SecItemCopyMatching failed: " + rc);
+            }
 
-        CoreFoundation.CFArrayRef certArray = returnedCertArray.getArray();
-        if (certArray == null) {
-            return Collections.emptyList();
-        }
+            certArray = returnedCertArray.getArray();
+            if (certArray == null) {
+                return Collections.emptyList();
+            }
 
-        try {
             List<X509Certificate> result = new ArrayList<>();
 
             for (int i = 0; i < certArray.getCount(); i++) {
@@ -133,10 +124,14 @@ public class SecurityFrameworkUtil {
 
             return result;
         } finally {
-            certArray.release();
-
-            if (keychainArr != null) {
-                keychainArr.release();
+            if (query != null) {
+                query.release();
+            }
+            if (certArray != null) {
+                certArray.release();
+            }
+            if (searchDomainList != null) {
+                searchDomainList.release();
             }
             SecurityFramework.SecKeychainRef secKeychainRef = keychain.getSecKeychainRef();
             if (secKeychainRef != null) {
