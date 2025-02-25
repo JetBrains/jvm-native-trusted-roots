@@ -23,6 +23,13 @@ public interface SecurityFramework extends Library {
      * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimit">https://developer.apple.com/documentation/security/kSecMatchLimit</a>
      */
     CoreFoundation.CFStringRef kSecMatchLimit = resolveSecurityFrameworkString("kSecMatchLimit");
+
+    /**
+     * A key whose value indicates a list of items to search.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchSearchList">https://developer.apple.com/documentation/security/kSecMatchSearchList</a>
+     */
+    CoreFoundation.CFStringRef kSecMatchSearchList = resolveSecurityFrameworkString("kSecMatchSearchList");
     /**
      * A value that corresponds to matching an unlimited number of items.
      *
@@ -86,6 +93,14 @@ public interface SecurityFramework extends Library {
     OSStatus SecItemCopyMatching(@NotNull CoreFoundation.CFDictionaryRef query, CFArrayRefByReference result);
 
     /**
+     * Opens a keychain.
+     * @param pathName A constant character string representing the POSIX path to the keychain to open.
+     * @param keychain On return, a pointer to the keychain object. You must call the CFRelease function to release this object when you are finished using it.
+     * @return A result code. See {@link OSStatus}
+     */
+    OSStatus SecKeychainOpen(String pathName, SecKeychainRefByReference keychain);
+
+    /**
      * Retrieves the common name of the subject of a certificate.
      *
      * @param certificate
@@ -104,6 +119,11 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFTypeID SecPolicyGetTypeID();
 
     /**
+     * Returns the unique identifier of the opaque type to which a keychain object belongs.
+     */
+    CoreFoundation.CFTypeID SecKeychainGetTypeID();
+
+    /**
      * Returns the unique identifier of the opaque type to which a trust object belongs
      *
      * @see <a href="https://developer.apple.com/documentation/security/sectrustgettypeid()">https://developer.apple.com/documentation/security/sectrustgettypeid()</a>
@@ -113,6 +133,7 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFTypeID SecTrustGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
+    CoreFoundation.CFTypeID SEC_SEC_KEYCHAIN_REF_TYPE_ID = INSTANCE.SecKeychainGetTypeID();
     CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
     CoreFoundation.CFTypeID SEC_TRUST_TYPE_ID = INSTANCE.SecTrustGetTypeID();
 
@@ -130,6 +151,42 @@ public interface SecurityFramework extends Library {
             if (!isTypeID(SEC_CERTIFICATE_TYPE_ID)) {
                 throw new ClassCastException("Unable to cast to SecCertificateRef. Type ID: " + getTypeID());
             }
+        }
+    }
+
+    /**
+     * An opaque type that represents a keychain.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/SecKeychainRef">developer.apple.com</a>
+     */
+    class SecKeychainRef extends CoreFoundation.CFTypeRef {
+        public SecKeychainRef() {
+        }
+
+        public SecKeychainRef(Pointer p) {
+            super(p);
+            if (!isTypeID(SEC_SEC_KEYCHAIN_REF_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecCertificateRef. Type ID: " + getTypeID());
+            }
+        }
+    }
+
+    class SecKeychainRefByReference extends PointerByReference {
+        public SecKeychainRefByReference() {
+        }
+
+        public SecKeychainRefByReference(SecKeychainRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public SecKeychainRef getSecKeychainRef() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new SecKeychainRef(value);
         }
     }
 

@@ -28,9 +28,53 @@ public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
     public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) {
-        CoreFoundation.CFDictionaryRef query = null;
+        List<X509Certificate> result = copyMatchingCertificates(domain, cert -> isTrustedRoot(domain, cert));
 
-        try {
+        if (LOGGER.isLoggable(Level.FINE)) {
+            StringBuilder message = new StringBuilder();
+            message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
+
+            for (X509Certificate certificate : result) {
+                message.append("\n  ").append(certificate.getSubjectX500Principal());
+            }
+
+            LOGGER.fine(message.toString());
+        }
+
+        return result;
+    }
+
+    @NotNull
+    public static List<X509Certificate> copyMatchingCertificates(
+            SecurityFramework.SecTrustSettingsDomain domain,
+            Predicate<SecurityFramework.SecCertificateRef> predicate
+    ) {
+        CFArrayRefByReference returnedCertArray = new CFArrayRefByReference();
+        SecurityFramework.SecKeychainRefByReference keychain = new SecurityFramework.SecKeychainRefByReference();
+        CoreFoundation.CFArrayRef keychainArr = null;
+
+        boolean systemDomain = domain.equals(SecurityFramework.SecTrustSettingsDomain.system);
+        CoreFoundation.CFDictionaryRef query;
+        if (systemDomain) {
+                SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainOpen("/System/Library/Keychains/SystemRootCertificates.keychain", keychain);
+                if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                    throw new IllegalStateException("Failed to read system keychain: " + rc);
+                }
+
+                Pointer[] pointer = {keychain.getPointer()};
+                keychainArr = CoreFoundationExt.INSTANCE.CFArrayCreate(
+                        null, pointer, new CoreFoundation.CFIndex(1), null
+                );
+
+                query = CoreFoundationExtUtil.createDictionary(
+                        Map.of(
+                                SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
+                                SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
+                                SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll,
+                                SecurityFramework.kSecMatchSearchList, keychainArr
+                        )
+                );
+        } else {
             query = CoreFoundationExtUtil.createDictionary(
                     Map.of(
                             SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
@@ -38,36 +82,10 @@ public class SecurityFrameworkUtil {
                             SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll
                     )
             );
-
-            List<X509Certificate> result = copyMatchingCertificates(query, cert -> isTrustedRoot(domain, cert));
-
-            if (LOGGER.isLoggable(Level.FINE)) {
-                StringBuilder message = new StringBuilder();
-                message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
-
-                for (X509Certificate certificate : result) {
-                    message.append("\n  ").append(certificate.getSubjectX500Principal());
-                }
-
-                LOGGER.fine(message.toString());
-            }
-
-            return result;
-        } finally {
-            if (query != null) {
-                query.release();
-            }
         }
-    }
 
-    @NotNull
-    public static List<X509Certificate> copyMatchingCertificates(
-            CoreFoundation.CFDictionaryRef secItemCopyMatchingQuery,
-            Predicate<SecurityFramework.SecCertificateRef> predicate
-    ) {
-
-        CFArrayRefByReference returnedCertArray = new CFArrayRefByReference();
-        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecItemCopyMatching(secItemCopyMatchingQuery, returnedCertArray);
+        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecItemCopyMatching(query, returnedCertArray);
+        query.release();
 
         if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
             throw new IllegalStateException("SecItemCopyMatching failed: " + rc);
@@ -83,14 +101,16 @@ public class SecurityFrameworkUtil {
 
             for (int i = 0; i < certArray.getCount(); i++) {
                 SecurityFramework.SecCertificateRef secCertificateRef = new SecurityFramework.SecCertificateRef(certArray.getValueAtIndex(i));
-                try {
-                    if (!predicate.test(secCertificateRef)) {
+                if (!systemDomain) {
+                    try {
+                        if (!predicate.test(secCertificateRef)) {
+                            continue;
+                        }
+                    } catch (Throwable predicateError) {
+                        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                        LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
                         continue;
                     }
-                } catch (Throwable predicateError) {
-                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
-                    LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
-                    continue;
                 }
 
                 try {
@@ -104,6 +124,14 @@ public class SecurityFrameworkUtil {
             return result;
         } finally {
             certArray.release();
+
+            if (keychainArr != null) {
+                keychainArr.release();
+            }
+            SecurityFramework.SecKeychainRef secKeychainRef = keychain.getSecKeychainRef();
+            if (secKeychainRef != null) {
+                secKeychainRef.release();
+            }
         }
     }
 
@@ -149,7 +177,7 @@ public class SecurityFrameworkUtil {
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
                     subjCerts, policy, secTrustRefByReference);
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
-                /* should never happen */
+                LOGGER.warning("Failed to create trust object: " + rc);
                 return false;
             }
 
