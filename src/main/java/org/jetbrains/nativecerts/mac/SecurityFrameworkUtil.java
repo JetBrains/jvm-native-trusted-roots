@@ -61,16 +61,15 @@ public class SecurityFrameworkUtil {
                     throw new IllegalStateException("Failed to read system keychain: " + rc);
                 }
 
-                Pointer[] pointer = {keychain.getPointer()};
-                keychainArr = CoreFoundationExt.INSTANCE.CFArrayCreate(
-                        null, pointer, new CoreFoundation.CFIndex(1), null
+                keychainArr = CoreFoundation.INSTANCE.CFArrayCreate(
+                        null, keychain.getPointer(), new CoreFoundation.CFIndex(1), null
                 );
 
                 query = CoreFoundationExtUtil.createDictionary(
                         Map.of(
                                 SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
-                                SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
                                 SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll,
+                                SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
                                 SecurityFramework.kSecMatchSearchList, keychainArr
                         )
                 );
