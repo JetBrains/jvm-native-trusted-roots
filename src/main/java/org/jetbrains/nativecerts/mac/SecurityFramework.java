@@ -367,7 +367,16 @@ public interface SecurityFramework extends Library {
      */
     boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
 
-    OSStatus SecKeychainCopyDomainSearchList(SecurityFramework.SecTrustSettingsDomain domain, CFArrayRefByReference searchList);
+    /**
+     * Retrieves the keychain search list for a specified preference domain.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:">https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:</a>
+     *
+     * @param domain The preference domain from which you wish to retrieve the keychain search list. See {@link SecTrustSettingsDomain} for possible domain values.
+     * @param searchList On return, a pointer to the keychain search list of the specified preference domain.
+     * @return A result code. See {@link OSStatus}
+     */
+    OSStatus SecKeychainCopyDomainSearchList(SecTrustSettingsDomain domain, CFArrayRefByReference searchList);
 
     /**
      * Trust settings returned in usage constraints dictionaries.
