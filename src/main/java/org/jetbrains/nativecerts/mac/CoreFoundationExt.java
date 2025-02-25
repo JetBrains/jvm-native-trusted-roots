@@ -33,6 +33,8 @@ public interface CoreFoundationExt extends Library {
             Pointer valueCallBacks
     );
 
+    void CFShow(CoreFoundation.CFTypeRef obj);
+
     /**
      * Creates a new immutable array with the given values.
      * <p>

@@ -50,6 +50,7 @@ public class SecurityFrameworkUtil {
             Predicate<SecurityFramework.SecCertificateRef> predicate
     ) {
         CFArrayRefByReference returnedCertArray = new CFArrayRefByReference();
+        CFArrayRefByReference searchDomainArray = new CFArrayRefByReference();
         SecurityFramework.SecKeychainRefByReference keychain = new SecurityFramework.SecKeychainRefByReference();
         CoreFoundation.CFArrayRef keychainArr = null;
 
@@ -74,11 +75,21 @@ public class SecurityFrameworkUtil {
                         )
                 );
         } else {
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainCopyDomainSearchList(domain, searchDomainArray);
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                throw new IllegalStateException("SecKeychainCopyDomainSearchList failed: " + rc);
+            }
+            CoreFoundation.CFArrayRef searchDomainList = searchDomainArray.getArray();
+            if (searchDomainList == null) {
+                throw new IllegalStateException("Unexpected null search domain list");
+            }
+
             query = CoreFoundationExtUtil.createDictionary(
                     Map.of(
                             SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
+                            SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll,
                             SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
-                            SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll
+                            SecurityFramework.kSecMatchSearchList, searchDomainList
                     )
             );
         }

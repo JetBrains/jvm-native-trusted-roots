@@ -366,6 +366,9 @@ public interface SecurityFramework extends Library {
      * @return true if the certificate is trusted; otherwise, false.
      */
     boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
+
+    OSStatus SecKeychainCopyDomainSearchList(SecurityFramework.SecTrustSettingsDomain domain, CFArrayRefByReference searchList);
+
     /**
      * Trust settings returned in usage constraints dictionaries.
      *
