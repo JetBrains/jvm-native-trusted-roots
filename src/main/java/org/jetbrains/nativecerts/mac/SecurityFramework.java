@@ -8,6 +8,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFArrayRefByReference;
 import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFStringRefByReference;
 
+import static com.sun.jna.platform.mac.CoreFoundation.CFStringRef.createCFString;
+
 @SuppressWarnings("unused")
 public interface SecurityFramework extends Library {
 
@@ -15,41 +17,39 @@ public interface SecurityFramework extends Library {
 
     /**
      * A dictionary key whose value is the item’s class.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/ksecclass">https://developer.apple.com/documentation/security/ksecclass</a>
      */
-    CoreFoundation.CFStringRef kSecClass = resolveSecurityFrameworkString("kSecClass");
+    CoreFoundation.CFStringRef kSecClass = resolveStringConstant("kSecClass");
+
     /**
      * A key whose value indicates the match limit.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimit">https://developer.apple.com/documentation/security/kSecMatchLimit</a>
      */
-    CoreFoundation.CFStringRef kSecMatchLimit = resolveSecurityFrameworkString("kSecMatchLimit");
+    CoreFoundation.CFStringRef kSecMatchLimit = resolveStringConstant("kSecMatchLimit");
 
     /**
      * A key whose value indicates a list of items to search.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/kSecMatchSearchList">https://developer.apple.com/documentation/security/kSecMatchSearchList</a>
      */
-    CoreFoundation.CFStringRef kSecMatchSearchList = resolveSecurityFrameworkString("kSecMatchSearchList");
+    CoreFoundation.CFStringRef kSecMatchSearchList = resolveStringConstant("kSecMatchSearchList");
+
     /**
      * A value that corresponds to matching an unlimited number of items.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimitAll">https://developer.apple.com/documentation/security/kSecMatchLimitAll</a>
      */
-    CoreFoundation.CFStringRef kSecMatchLimitAll = resolveSecurityFrameworkString("kSecMatchLimitAll");
+    CoreFoundation.CFStringRef kSecMatchLimitAll = resolveStringConstant("kSecMatchLimitAll");
+
     /**
      * A key whose value is a Boolean indicating whether or not to return a reference to an item.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/kSecReturnRef">https://developer.apple.com/documentation/security/kSecReturnRef</a>
      */
-    CoreFoundation.CFStringRef kSecReturnRef = resolveSecurityFrameworkString("kSecReturnRef");
+    CoreFoundation.CFStringRef kSecReturnRef = resolveStringConstant("kSecReturnRef");
+
     /**
      * The value that indicates a certificate item.
-     *
      * @see <a href="https://developer.apple.com/documentation/security/kSecClassCertificate">https://developer.apple.com/documentation/security/kSecClassCertificate</a>
      */
-    CoreFoundation.CFStringRef kSecClassCertificate = resolveSecurityFrameworkString("kSecClassCertificate");
+    CoreFoundation.CFStringRef kSecClassCertificate = resolveStringConstant("kSecClassCertificate");
 
     /**
      * Returns a string explaining the meaning of a security result code.
@@ -63,7 +63,7 @@ public interface SecurityFramework extends Library {
      *          A human-readable string describing the result, or NULL if no string is available for the specified result code.
      *          Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object when you are finished using it.
      *
-     * @see <a href="https://developer.apple.com/documentation/security/1394686-seccopyerrormessagestring">developer.apple.com</a>
+     * @see <a href="https://developer.apple.com/documentation/security/seccopyerrormessagestring(_:_:)">https://developer.apple.com/documentation/security/seccopyerrormessagestring(_:_:)</a>
      */
     @Nullable
     CoreFoundation.CFStringRef SecCopyErrorMessageString(@NotNull OSStatus status, @Nullable Pointer reserved);
@@ -96,8 +96,10 @@ public interface SecurityFramework extends Library {
 
     /**
      * Opens a keychain.
+     * @see <a href="https://developer.apple.com/documentation/security/seckeychainopen(_:_:)">https://developer.apple.com/documentation/security/seckeychainopen(_:_:)</a>
      * @param pathName A constant character string representing the POSIX path to the keychain to open.
-     * @param keychain On return, a pointer to the keychain object. You must call the CFRelease function to release this object when you are finished using it.
+     * @param keychain On return, a pointer to the keychain object.
+     *                 You must call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object when you are finished using it.
      * @return A result code. See {@link OSStatus}
      */
     OSStatus SecKeychainOpen(String pathName, SecKeychainRefByReference keychain);
@@ -119,19 +121,7 @@ public interface SecurityFramework extends Library {
 
     CoreFoundation.CFTypeID SecCertificateGetTypeID();
     CoreFoundation.CFTypeID SecPolicyGetTypeID();
-
-    /**
-     * Returns the unique identifier of the opaque type to which a keychain object belongs.
-     */
     CoreFoundation.CFTypeID SecKeychainGetTypeID();
-
-    /**
-     * Returns the unique identifier of the opaque type to which a trust object belongs
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/sectrustgettypeid()">https://developer.apple.com/documentation/security/sectrustgettypeid()</a>
-     *
-     * @return A value that identifies the opaque type of a SecTrustRef object.
-     */
     CoreFoundation.CFTypeID SecTrustGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
@@ -289,42 +279,42 @@ public interface SecurityFramework extends Library {
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyapplessl">developer.apple.com</a>
      */
-    CoreFoundation.CFStringRef kSecPolicyAppleSSL = CoreFoundation.CFStringRef.createCFString("1.2.840.113635.100.1.3");
+    CoreFoundation.CFStringRef kSecPolicyAppleSSL = resolveStringConstant("kSecPolicyAppleSSL");
 
     /**
      * The object identifier that defines the policy type (CFStringRef). All policies have a value for this key.
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyoid">developer.apple.com</a>
      */
-    CoreFoundation.CFStringRef kSecPolicyOid = CoreFoundation.CFStringRef.createCFString("SecPolicyOid");
+    CoreFoundation.CFStringRef kSecPolicyOid = resolveStringConstant("kSecPolicyOid");
 
     /**
      * A number indicating the effective trust setting for this usage constraints dictionary.
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsresult">developer.apple.com</a>
      */
-    CoreFoundation.CFStringRef kSecTrustSettingsResult = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsResult");
+    CoreFoundation.CFStringRef kSecTrustSettingsResult = createCFString("kSecTrustSettingsResult");
 
     /**
      * A number which, if encountered during certificate verification, is ignored for that certificate.
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsallowederror">developer.apple.com</a>
      */
-    CoreFoundation.CFStringRef kSecTrustSettingsAllowedError = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsAllowedError");
+    CoreFoundation.CFStringRef kSecTrustSettingsAllowedError = createCFString("kSecTrustSettingsAllowedError");
 
     /**
      * Specifies a cert verification policy, e.g., sslServer, eapClient, etc. using policy names.
      * This entry can be used to restrict the policy where
      * the same Policy Constant is used for multiple policyNames
      */
-    CoreFoundation.CFStringRef kSecTrustSettingsPolicyName = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsPolicyName");
+    CoreFoundation.CFStringRef kSecTrustSettingsPolicyName = createCFString("kSecTrustSettingsPolicyName");
 
     /**
      * A policy object specifying the certificate verification policy.
      *
      * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingspolicy">developer.apple.com</a>
      */
-    CoreFoundation.CFStringRef kSecTrustSettingsPolicy = CoreFoundation.CFStringRef.createCFString("kSecTrustSettingsPolicy");
+    CoreFoundation.CFStringRef kSecTrustSettingsPolicy = createCFString("kSecTrustSettingsPolicy");
 
     /**
      * Obtains the trust settings for a certificate.
@@ -520,7 +510,7 @@ public interface SecurityFramework extends Library {
         }
     }
 
-    private static CoreFoundation.CFStringRef resolveSecurityFrameworkString(String name) {
+    private static CoreFoundation.CFStringRef resolveStringConstant(String name) {
         Pointer pointer = Native.getNativeLibrary(SecurityFramework.INSTANCE).getGlobalVariableAddress(name);
         return new CoreFoundation.CFStringRef(pointer.getPointer(0));
     }
