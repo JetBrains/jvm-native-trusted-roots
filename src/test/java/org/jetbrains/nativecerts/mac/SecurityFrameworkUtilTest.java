@@ -126,6 +126,7 @@ public class SecurityFrameworkUtilTest {
 
             // remove root cert. Both root and intermediate should disappear
             assertTrue(removeTrustedCert(getTestCertificatePath()));
+            Thread.sleep(2000L);
             assertFalse(verifyCert(intermediatePath, null));
             assertFalse(verifyCert(getTestCertificatePath(), null));
 
