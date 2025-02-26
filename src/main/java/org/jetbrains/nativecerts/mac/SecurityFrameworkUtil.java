@@ -172,10 +172,7 @@ public class SecurityFrameworkUtil {
         SecurityFramework.SecTrustRefByReference secTrustRefByReference = null;
         CoreFoundation.CFArrayRef subjCerts = null;
         try {
-            final Pointer[] values = {certificateRef.getPointer()};
-            subjCerts = CoreFoundationExt.INSTANCE.CFArrayCreate(
-                    null, values, new CoreFoundation.CFIndex(1), null
-            );
+            subjCerts = CoreFoundationExtUtil.createArray(new CoreFoundation.CFTypeRef[]{certificateRef});
 
             secTrustRefByReference = new SecurityFramework.SecTrustRefByReference();
 

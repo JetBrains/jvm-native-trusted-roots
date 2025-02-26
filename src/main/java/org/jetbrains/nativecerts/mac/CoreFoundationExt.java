@@ -80,7 +80,7 @@ public interface CoreFoundationExt extends Library {
      *         {@code values}, or {@code null} if there was a problem creating the
      *         object.
      */
-    CoreFoundation.CFArrayRef CFArrayCreate(CoreFoundation.CFAllocatorRef alloc, Pointer[] values, CoreFoundation.CFIndex numValues, Pointer callBacks);
+    CoreFoundation.CFArrayRef CFArrayCreate(CoreFoundation.CFAllocatorRef alloc, CoreFoundation.CFTypeRef[] values, CoreFoundation.CFIndex numValues, Pointer callBacks);
 
     /**
      * Determines whether two Core Foundation objects are considered equal.

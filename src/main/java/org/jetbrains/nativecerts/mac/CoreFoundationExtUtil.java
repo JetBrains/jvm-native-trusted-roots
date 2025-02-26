@@ -26,4 +26,10 @@ public class CoreFoundationExtUtil {
                 null,
                 keys, values, new CoreFoundation.CFIndex(mapSize), null, null);
     }
+
+    public static CoreFoundation.CFArrayRef createArray(CFTypeRef[] array) {
+        return CoreFoundationExt.INSTANCE.CFArrayCreate(
+                null, array, new CoreFoundation.CFIndex(array.length), null
+        );
+    }
 }
