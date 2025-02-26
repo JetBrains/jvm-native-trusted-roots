@@ -2,6 +2,7 @@ package org.jetbrains.nativecerts.mac;
 
 import com.sun.jna.*;
 import com.sun.jna.platform.mac.CoreFoundation;
+import com.sun.jna.ptr.PointerByReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -9,6 +10,44 @@ import org.jetbrains.annotations.Nullable;
 public interface SecurityFramework extends Library {
 
     SecurityFramework INSTANCE = Native.load("Security", SecurityFramework.class);
+
+    /**
+     * A dictionary key whose value is the item’s class.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/ksecclass">https://developer.apple.com/documentation/security/ksecclass</a>
+     */
+    CoreFoundation.CFStringRef kSecClass = resolveSecurityFrameworkString("kSecClass");
+    /**
+     * A key whose value indicates the match limit.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimit">https://developer.apple.com/documentation/security/kSecMatchLimit</a>
+     */
+    CoreFoundation.CFStringRef kSecMatchLimit = resolveSecurityFrameworkString("kSecMatchLimit");
+
+    /**
+     * A key whose value indicates a list of items to search.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchSearchList">https://developer.apple.com/documentation/security/kSecMatchSearchList</a>
+     */
+    CoreFoundation.CFStringRef kSecMatchSearchList = resolveSecurityFrameworkString("kSecMatchSearchList");
+    /**
+     * A value that corresponds to matching an unlimited number of items.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimitAll">https://developer.apple.com/documentation/security/kSecMatchLimitAll</a>
+     */
+    CoreFoundation.CFStringRef kSecMatchLimitAll = resolveSecurityFrameworkString("kSecMatchLimitAll");
+    /**
+     * A key whose value is a Boolean indicating whether or not to return a reference to an item.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecReturnRef">https://developer.apple.com/documentation/security/kSecReturnRef</a>
+     */
+    CoreFoundation.CFStringRef kSecReturnRef = resolveSecurityFrameworkString("kSecReturnRef");
+    /**
+     * The value that indicates a certificate item.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/kSecClassCertificate">https://developer.apple.com/documentation/security/kSecClassCertificate</a>
+     */
+    CoreFoundation.CFStringRef kSecClassCertificate = resolveSecurityFrameworkString("kSecClassCertificate");
 
     /**
      * Returns a string explaining the meaning of a security result code.
@@ -47,6 +86,21 @@ public interface SecurityFramework extends Library {
     OSStatus SecTrustSettingsCopyCertificates(@NotNull SecTrustSettingsDomain domain, @NotNull CFArrayRefByReference certArray);
 
     /**
+     * Returns one or more keychain items that match a search query, or copies attributes of specific keychain items.
+     * @see <a href="https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)">https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)</a>
+     */
+    @NotNull
+    OSStatus SecItemCopyMatching(@NotNull CoreFoundation.CFDictionaryRef query, CFArrayRefByReference result);
+
+    /**
+     * Opens a keychain.
+     * @param pathName A constant character string representing the POSIX path to the keychain to open.
+     * @param keychain On return, a pointer to the keychain object. You must call the CFRelease function to release this object when you are finished using it.
+     * @return A result code. See {@link OSStatus}
+     */
+    OSStatus SecKeychainOpen(String pathName, SecKeychainRefByReference keychain);
+
+    /**
      * Retrieves the common name of the subject of a certificate.
      *
      * @param certificate
@@ -64,8 +118,24 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFTypeID SecCertificateGetTypeID();
     CoreFoundation.CFTypeID SecPolicyGetTypeID();
 
+    /**
+     * Returns the unique identifier of the opaque type to which a keychain object belongs.
+     */
+    CoreFoundation.CFTypeID SecKeychainGetTypeID();
+
+    /**
+     * Returns the unique identifier of the opaque type to which a trust object belongs
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrustgettypeid()">https://developer.apple.com/documentation/security/sectrustgettypeid()</a>
+     *
+     * @return A value that identifies the opaque type of a SecTrustRef object.
+     */
+    CoreFoundation.CFTypeID SecTrustGetTypeID();
+
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
+    CoreFoundation.CFTypeID SEC_SEC_KEYCHAIN_REF_TYPE_ID = INSTANCE.SecKeychainGetTypeID();
     CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
+    CoreFoundation.CFTypeID SEC_TRUST_TYPE_ID = INSTANCE.SecTrustGetTypeID();
 
     /**
      * An abstract Core Foundation-type object representing an X.509 certificate.
@@ -85,6 +155,42 @@ public interface SecurityFramework extends Library {
     }
 
     /**
+     * An opaque type that represents a keychain.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/SecKeychainRef">developer.apple.com</a>
+     */
+    class SecKeychainRef extends CoreFoundation.CFTypeRef {
+        public SecKeychainRef() {
+        }
+
+        public SecKeychainRef(Pointer p) {
+            super(p);
+            if (!isTypeID(SEC_SEC_KEYCHAIN_REF_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecCertificateRef. Type ID: " + getTypeID());
+            }
+        }
+    }
+
+    class SecKeychainRefByReference extends PointerByReference {
+        public SecKeychainRefByReference() {
+        }
+
+        public SecKeychainRefByReference(SecKeychainRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public SecKeychainRef getSecKeychainRef() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new SecKeychainRef(value);
+        }
+    }
+
+    /**
      * An object that represents a trust policy.
      *
      * @see <a href="https://developer.apple.com/documentation/security/secpolicyref">developer.apple.com</a>
@@ -100,6 +206,53 @@ public interface SecurityFramework extends Library {
             }
         }
     }
+
+    /**
+     * An object used to evaluate trust.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrust">developer.apple.com</a>
+     */
+    class SecTrustRef extends CoreFoundation.CFTypeRef {
+        public SecTrustRef() {
+        }
+
+        public SecTrustRef(Pointer p) {
+            super(p);
+            if (!isTypeID(SEC_TRUST_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecTrustRef. Type ID: " + getTypeID());
+            }
+        }
+    }
+
+    class SecTrustRefByReference extends PointerByReference {
+        public SecTrustRefByReference() {
+        }
+
+        public SecTrustRefByReference(SecTrustRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public SecTrustRef getSecTrustRef() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new SecTrustRef(value);
+        }
+    }
+
+    /**
+     * Returns a policy object for evaluating SSL certificate chains.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)">https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)</a>
+     *
+     * @param server Specify true on the client side to return a policy for SSL server certificates.
+     * @param hostname If you specify a value for this parameter, the policy will require the specified value to match the host name in the leaf certificate.
+     * @return The policy object. In Objective-C, call the CFRelease function to release the object when you are finished with it.
+     */
+    SecPolicyRef SecPolicyCreateSSL(boolean server, CoreFoundation.CFStringRef hostname);
 
     /**
      * Returns a dictionary containing a policy’s properties.
@@ -193,6 +346,37 @@ public interface SecurityFramework extends Library {
      * @see <a href="https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting">developer.apple.com</a>
      */
     OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain, CFArrayRefByReference trustSettings);
+
+    /**
+     * Creates a trust management object based on certificates and policies.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)">https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)</a>
+     *
+     * @param certificates The certificate to be verified, plus any other certificates you think might be useful for verifying the certificate. The certificate to be verified must be the first in the array. If you want to specify only one certificate, you can pass a SecCertificateRef object; otherwise, pass an array of SecCertificateRef objects.
+     * @param policies References to one or more policies to be evaluated. You can pass a single SecPolicyRef object, or an array of one or more SecPolicyRef objects. If you pass in multiple policies, all policies must verify for the certificate chain to be considered valid. You typically use one of the standard policies, like the one returned by SecPolicyCreateBasicX509.
+     * @param trust On return, points to the newly created trust management object. In Objective-C, call the CFRelease function to release this object when you are finished with it.
+     * @return A result code. See <a href="https://developer.apple.com/documentation/security/security-framework-result-codes">Security Framework Result Codes</a>.
+     */
+    OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecPolicyRef policies, SecTrustRefByReference trust);
+
+    /**
+     * Evaluates trust for the specified certificate and policies.
+     * @param trust The trust management object to evaluate. A trust management object includes the certificate to be verified plus the policy or policies to be used in evaluating trust. It can optionally also include other certificates to be used in verifying the first certificate. Use the SecTrustCreateWithCertificates function to create a trust management object.
+     * @param error An error pointer the method uses to return an error when trust evaluation fails. Set to nil to ignore the error.
+     * @return true if the certificate is trusted; otherwise, false.
+     */
+    boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
+
+    /**
+     * Retrieves the keychain search list for a specified preference domain.
+     *
+     * @see <a href="https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:">https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:</a>
+     *
+     * @param domain The preference domain from which you wish to retrieve the keychain search list. See {@link SecTrustSettingsDomain} for possible domain values.
+     * @param searchList On return, a pointer to the keychain search list of the specified preference domain.
+     * @return A result code. See {@link OSStatus}
+     */
+    OSStatus SecKeychainCopyDomainSearchList(SecTrustSettingsDomain domain, CFArrayRefByReference searchList);
 
     /**
      * Trust settings returned in usage constraints dictionaries.
@@ -332,5 +516,10 @@ public interface SecurityFramework extends Library {
         public SecTrustSettingsDomain(long value) {
             super(value);
         }
+    }
+
+    private static CoreFoundation.CFStringRef resolveSecurityFrameworkString(String name) {
+        Pointer pointer = Native.getNativeLibrary(SecurityFramework.INSTANCE).getGlobalVariableAddress(name);
+        return new CoreFoundation.CFStringRef(pointer.getPointer(0));
     }
 }

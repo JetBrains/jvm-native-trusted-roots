@@ -9,6 +9,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,24 +18,24 @@ import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderEx
 
 /**
  * Get trusted certificates stored in corresponding keychains via Security frameworks APIs.
- * for the other implementations see root_cgo_darwin.go in Go and trust_store_mac.cc in Chromium
+ * for the other implementations, see root_cgo_darwin.go in Go and trust_store_mac.cc in Chromium
  * <br><br>
  * In the future it would be better to implement {@code X509TrustManager} on <a href="https://developer.apple.com/documentation/security/2980705-sectrustevaluatewitherror">SecTrustEvaluateWithError</a> instead
- * of getting trust chain manually. It's not yet investigated whether it is possible at all to integrate it into
+ * of getting the trust chain manually. It's not yet investigated whether it is possible at all to integrate it into
  * the SSL framework of JVM.
  */
 public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
     public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) {
-        List<X509Certificate> result = SecTrustSettingsCopyCertificates(domain, cert -> isTrustedRoot(domain, cert));
+        List<X509Certificate> result = copyMatchingCertificates(domain, cert -> isTrustedRoot(domain, cert));
 
         if (LOGGER.isLoggable(Level.FINE)) {
             StringBuilder message = new StringBuilder();
             message.append("Received ").append(result.size()).append(" certificates from trust settings domain ").append(domain);
 
             for (X509Certificate certificate : result) {
-                message.append("\n  ").append(certificate.getSubjectDN());
+                message.append("\n  ").append(certificate.getSubjectX500Principal());
             }
 
             LOGGER.fine(message.toString());
@@ -44,38 +45,73 @@ public class SecurityFrameworkUtil {
     }
 
     @NotNull
-    public static List<X509Certificate> SecTrustSettingsCopyCertificates(
-            @NotNull SecurityFramework.SecTrustSettingsDomain domain,
-            Predicate<SecurityFramework.SecCertificateRef> predicate) {
+    public static List<X509Certificate> copyMatchingCertificates(
+            SecurityFramework.SecTrustSettingsDomain domain,
+            Predicate<SecurityFramework.SecCertificateRef> predicate
+    ) {
         CFArrayRefByReference returnedCertArray = new CFArrayRefByReference();
-        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyCertificates(domain, returnedCertArray);
-        if (SecurityFramework.OSStatus.errSecNoTrustSettings.equals(rc)) {
-            return Collections.emptyList();
-        }
+        CFArrayRefByReference searchDomainArray = new CFArrayRefByReference();
+        SecurityFramework.SecKeychainRefByReference keychain = new SecurityFramework.SecKeychainRefByReference();
+        CoreFoundation.CFArrayRef searchDomainList = null;
+        CoreFoundation.CFArrayRef certArray = null;
 
-        if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
-            throw new IllegalStateException("Getting trust settings for domain " + domain +
-                    " failed: " + rc);
-        }
-
-        CoreFoundation.CFArrayRef certArray = returnedCertArray.getArray();
-        if (certArray == null) {
-            return Collections.emptyList();
-        }
-
+        boolean systemDomain = domain.equals(SecurityFramework.SecTrustSettingsDomain.system);
+        CoreFoundation.CFDictionaryRef query = null;
         try {
+            if (systemDomain) {
+                // `SecKeychainCopyDomainSearchList` doesn't return the keychain for the system domain
+                SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainOpen("/System/Library/Keychains/SystemRootCertificates.keychain", keychain);
+                if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                    throw new IllegalStateException("Failed to read system keychain: " + rc);
+                }
+
+                searchDomainList = CoreFoundation.INSTANCE.CFArrayCreate(
+                        null, keychain.getPointer(), new CoreFoundation.CFIndex(1), null
+                );
+            } else {
+                SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecKeychainCopyDomainSearchList(domain, searchDomainArray);
+                if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                    throw new IllegalStateException("SecKeychainCopyDomainSearchList failed: " + rc);
+                }
+                searchDomainList = searchDomainArray.getArray();
+            }
+            if (searchDomainList == null) {
+                throw new IllegalStateException("Unexpected null search domain list");
+            }
+            query = CoreFoundationExtUtil.createDictionary(
+                    Map.of(
+                            SecurityFramework.kSecClass, SecurityFramework.kSecClassCertificate,
+                            SecurityFramework.kSecMatchLimit, SecurityFramework.kSecMatchLimitAll,
+                            SecurityFramework.kSecReturnRef, CoreFoundationExt.kCFBooleanTrue,
+                            SecurityFramework.kSecMatchSearchList, searchDomainList
+                    )
+            );
+
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecItemCopyMatching(query, returnedCertArray);
+
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                throw new IllegalStateException("SecItemCopyMatching failed: " + rc);
+            }
+
+            certArray = returnedCertArray.getArray();
+            if (certArray == null) {
+                return Collections.emptyList();
+            }
+
             List<X509Certificate> result = new ArrayList<>();
 
             for (int i = 0; i < certArray.getCount(); i++) {
                 SecurityFramework.SecCertificateRef secCertificateRef = new SecurityFramework.SecCertificateRef(certArray.getValueAtIndex(i));
-                try {
-                    if (!predicate.test(secCertificateRef)) {
+                if (!systemDomain) {
+                    try {
+                        if (!predicate.test(secCertificateRef)) {
+                            continue;
+                        }
+                    } catch (Throwable predicateError) {
+                        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                        LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
                         continue;
                     }
-                } catch (Throwable predicateError) {
-                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
-                    LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
-                    continue;
                 }
 
                 try {
@@ -88,7 +124,19 @@ public class SecurityFrameworkUtil {
 
             return result;
         } finally {
-            certArray.release();
+            if (query != null) {
+                query.release();
+            }
+            if (certArray != null) {
+                certArray.release();
+            }
+            if (searchDomainList != null) {
+                searchDomainList.release();
+            }
+            SecurityFramework.SecKeychainRef secKeychainRef = keychain.getSecKeychainRef();
+            if (secKeychainRef != null) {
+                secKeychainRef.release();
+            }
         }
     }
 
@@ -118,31 +166,80 @@ public class SecurityFrameworkUtil {
         return true;
     }
 
-    public static boolean isTrustedRoot(SecurityFramework.SecTrustSettingsDomain domain, SecurityFramework.SecCertificateRef certificateRef) {
-        boolean selfSignedCertificate = isSelfSignedCertificate(getX509Certificate(certificateRef));
+    private static boolean validateCertificate(SecurityFramework.SecCertificateRef certificateRef) {
+        SecurityFramework.SecPolicyRef policy = null;
+        SecurityFramework.SecTrustRefByReference secTrustRefByReference = null;
+        CoreFoundation.CFArrayRef subjCerts = null;
+        try {
+            final Pointer[] values = {certificateRef.getPointer()};
+            subjCerts = CoreFoundationExt.INSTANCE.CFArrayCreate(
+                    null, values, new CoreFoundation.CFIndex(1), null
+            );
 
-        CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
-        SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
+            secTrustRefByReference = new SecurityFramework.SecTrustRefByReference();
 
-        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef).stringValue();
+            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(false, null);
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
+                    subjCerts, policy, secTrustRefByReference);
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
+                LOGGER.warning("Failed to create trust object: " + rc);
+                return false;
+            }
 
-        CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
-        if (SecurityFramework.OSStatus.errSecItemNotFound.equals(rc) || trustedSettingsArray == null) {
-            // No trust record => do not trust
-            LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings");
-            return false;
-        }
-
-        if (LOGGER.isLoggable(Level.FINE)) {
-            try {
-                CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
-                LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
-            } catch (Throwable t) {
-                LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
+            return SecurityFramework.INSTANCE.SecTrustEvaluateWithError(secTrustRefByReference.getSecTrustRef(), null);
+        } finally {
+            if (policy != null) {
+                policy.release();
+            }
+            if (secTrustRefByReference != null) {
+                SecurityFramework.SecTrustRef secTrustRef = secTrustRefByReference.getSecTrustRef();
+                if (secTrustRef != null) {
+                    secTrustRef.release();
+                }
+            }
+            if (subjCerts != null) {
+                subjCerts.release();
             }
         }
+    }
+
+    public static boolean isTrustedRoot(SecurityFramework.SecTrustSettingsDomain domain, SecurityFramework.SecCertificateRef certificateRef) {
+        boolean selfSignedCertificate = isSelfSignedCertificate(getX509Certificate(certificateRef));
+        CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
+        CoreFoundation.CFStringRef descriptionRef = null;
 
         try {
+            SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
+
+            descriptionRef = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef);
+            String certificateDescription = descriptionRef.stringValue();
+
+            CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
+            if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc) && !SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
+                LOGGER.fine("Failed to get trust settings for certificate '" + certificateDescription + "': " + rc);
+                return false;
+            }
+
+            if (trustedSettingsArray == null) {
+                // Trust record is null we need to verify the certificate first
+                boolean valid = validateCertificate(certificateRef);
+                if (valid) {
+                    return true;
+                } else {
+                    LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings and failed to validate against trusted roots");
+                    return false;
+                }
+            }
+
+            if (LOGGER.isLoggable(Level.FINE)) {
+                try {
+                    CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
+                    LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
+                } catch (Throwable t) {
+                    LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
+                }
+            }
+
             if (trustedSettingsArray.getCount() == 0) {
                 // https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
                 // An empty trust settings array (that is, the trustSettings parameter returns a valid but empty CFArray) means "always trust this certificate" with an overall trust setting for the certificate of kSecTrustSettingsResultTrustRoot
@@ -160,7 +257,7 @@ public class SecurityFrameworkUtil {
 
                     // from https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting
                     // If this key is not present, a default value of kSecTrustSettingsResultTrustRoot is assumed. Because only a root certificate can have this value, a usage constraints dictionary for a non-root certificate that is missing this key is not valid.
-                    // Note the distinction between the results kSecTrustSettingsResultTrustRoot and kSecTrustSettingsResultTrustAsRoot: The former can only be applied to root (self-signed) certificates; the latter can only be applied to non-root certificates. Therefore, an empty trust settings array for a non-root certificate is invalid, because the default value of kSecTrustSettingsResultTrustRoot is not valid for a non-root certificate.
+                    // Note the distinction between the results kSecTrustSettingsResultTrustRoot and kSecTrustSettingsResultTrustAsRoot: The former can only be applied to a root (self-signed) certificates; the latter can only be applied to non-root certificates. Therefore, an empty trust settings array for a non-root certificate is invalid, because the default value of kSecTrustSettingsResultTrustRoot is not valid for a non-root certificate.
 
                     SecurityFramework.SecTrustSettingsResult result;
                     if (value == null) {
@@ -239,7 +336,13 @@ public class SecurityFrameworkUtil {
             // No matched constraints => not a trusted root
             return false;
         } finally {
-            trustedSettingsArray.release();
+            if (descriptionRef != null) {
+                descriptionRef.release();
+            }
+            CoreFoundation.CFArrayRef array = trustedSettingsRef.getArray();
+            if (array != null) {
+                array.release();
+            }
         }
     }
 }

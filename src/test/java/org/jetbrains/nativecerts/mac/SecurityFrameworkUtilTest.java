@@ -14,12 +14,18 @@ import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.ExitCodeHandling;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.combineLists;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessAndGetExitCode;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcessGetStdout;
+import static org.jetbrains.nativecerts.NativeCertsTestUtil.getCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
@@ -50,7 +56,7 @@ public class SecurityFrameworkUtilTest {
 
         System.out.println(trustedRoots.size());
         for (X509Certificate root : trustedRoots) {
-            System.out.println(root.getSubjectDN().toString());
+            System.out.println(root.getSubjectX500Principal().toString());
         }
 
         Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
@@ -58,12 +64,12 @@ public class SecurityFrameworkUtilTest {
         Assert.assertTrue(
                 "Expected some roots from 'Google Trust Services LLC'",
                 trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("Google Trust Services LLC"))
+                        crt.getSubjectX500Principal().toString().contains("Google Trust Services LLC"))
         );
         Assert.assertTrue(
                 "Expected some roots from 'VeriSign'",
                 trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectDN().toString().contains("VeriSign"))
+                        crt.getSubjectX500Principal().toString().contains("VeriSign"))
         );
     }
 
@@ -87,6 +93,54 @@ public class SecurityFrameworkUtilTest {
         customUserTrustedCertificateTest("ssl", "deny", false);
     }
 
+    @Test
+    public void supportForIntermediateCertificates() throws InterruptedException {
+        Assume.assumeTrue(isManualTestingEnabled);
+
+        // add root cert
+        try {
+            Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
+            List<String> args = List.of(
+                    "/usr/bin/security",
+                    "add-trusted-cert",
+                    "-k", loginKeyChain.toString(),
+                    getTestCertificatePath().toString()
+            );
+            executeProcess(args);
+
+            Thread.sleep(2000L);
+
+            // add intermediate cert
+            args = List.of(
+                    "/usr/bin/security",
+                    "add-certificates",
+                    "-k", loginKeyChain.toString(),
+                    getCertificatePath("/mock-ca/intermediate-ca.pem").toString()
+            );
+            executeProcess(args);
+
+            // verify certs are trusted
+            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+
+            List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectX500Principal().toString())
+                    .collect(Collectors.toList());
+            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
+            assertThat(aliases.size(), is(greaterThan(1)));
+            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
+        } finally {
+            removeTrustedCert(getTestCertificatePath());
+
+            executeProcess(
+                    List.of(
+                            "/usr/bin/security",
+                            "delete-certificate",
+                            "-c", "JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA",
+                            "-t"
+                    )
+            );
+        }
+    }
+
     /**
      * @param policy Policy constraint (ssl, smime, codeSign, IPSec, iChat, basic, swUpdate, pkgSign, pkinitClient, pkinitServer, eap).
      * @param resultType trustRoot|trustAsRoot|deny|unspecified
@@ -98,8 +152,8 @@ public class SecurityFrameworkUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
         String sha256 = sha256hex(encoded);
-        assertEquals("1e4d664b61b49dd8bbd16e28e3abd7c6655aefa8", sha1);
-        assertEquals("f759db7e486bf13f39e70f481f57cc335ad3111c8f3b3a5cb6d4de363d7dd5db", sha256);
+        assertEquals("c1969052bc9a106a8a7997b84913e1530215ac45", sha1);
+        assertEquals("63609373bf25769df2a6e64378872d9d2697c48b53408dd1d0e38b2db4397fc6", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
