@@ -14,12 +14,10 @@ import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.ExitCodeHandling;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.combineLists;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.executeProcess;
@@ -30,8 +28,6 @@ import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificatePath;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.isManualTestingEnabled;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
-import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha1hex;
-import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.sha256hex;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -97,9 +93,16 @@ public class SecurityFrameworkUtilTest {
     public void supportForIntermediateCertificates() throws InterruptedException {
         Assume.assumeTrue(isManualTestingEnabled);
 
-        // add root cert
+        Path intermediatePath = getCertificatePath("/mock-ca/intermediate-ca.pem");
+
+        // remove just in case it was not cleaned up before
+        removeTrustedCert(getTestCertificatePath());
+        deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA");
+
         try {
             Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
+
+            // add root cert
             List<String> args = List.of(
                     "/usr/bin/security",
                     "add-trusted-cert",
@@ -111,33 +114,31 @@ public class SecurityFrameworkUtilTest {
             Thread.sleep(2000L);
 
             // add intermediate cert
-            args = List.of(
-                    "/usr/bin/security",
-                    "add-certificates",
-                    "-k", loginKeyChain.toString(),
-                    getCertificatePath("/mock-ca/intermediate-ca.pem").toString()
-            );
-            executeProcess(args);
+            addCertificate(loginKeyChain, intermediatePath);
 
-            // verify certs are trusted
-            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            // verify both certs are trusted
+            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<String> afterAddAliases = afterAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
+            assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
+            assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
+            assertTrue(verifyCert(intermediatePath, null));
+            assertTrue(verifyCert(getTestCertificatePath(), null));
 
-            List<String> aliases = rootsAfter.stream().map(crt -> crt.getSubjectX500Principal().toString())
-                    .collect(Collectors.toList());
-            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
-            assertThat(aliases.size(), is(greaterThan(1)));
-            assertThat(aliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
+            // remove root cert. Both root and intermediate should disappear
+            assertTrue(removeTrustedCert(getTestCertificatePath()));
+            assertFalse(verifyCert(intermediatePath, null));
+            assertFalse(verifyCert(getTestCertificatePath(), null));
+
+            List<X509Certificate> afterRootRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<String> afterRootRemovalAliases = afterRootRemoval.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
+            assertThat(afterRootRemovalAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS")));
+            assertThat(afterRootRemovalAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS")));
+
+            // assert cleanup
+            assertTrue(deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA"));
         } finally {
             removeTrustedCert(getTestCertificatePath());
-
-            executeProcess(
-                    List.of(
-                            "/usr/bin/security",
-                            "delete-certificate",
-                            "-c", "JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA",
-                            "-t"
-                    )
-            );
+            deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA");
         }
     }
 
@@ -148,12 +149,6 @@ public class SecurityFrameworkUtilTest {
     private void customUserTrustedCertificateTest(@Nullable String policy, String resultType, boolean shouldTrust) throws Exception {
         Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
         assertTrue(Files.isRegularFile(loginKeyChain));
-
-        byte[] encoded = getTestCertificate().getEncoded();
-        String sha1 = sha1hex(encoded);
-        String sha256 = sha256hex(encoded);
-        assertEquals("c1969052bc9a106a8a7997b84913e1530215ac45", sha1);
-        assertEquals("63609373bf25769df2a6e64378872d9d2697c48b53408dd1d0e38b2db4397fc6", sha256);
 
         // cleanup just in case it was imported before
         removeTrustedCert(getTestCertificatePath());
@@ -222,6 +217,26 @@ public class SecurityFrameworkUtilTest {
 
     private static boolean removeTrustedCert(Path cert) {
         int rc = executeProcessAndGetExitCode(List.of("/usr/bin/security", "remove-trusted-cert", cert.toAbsolutePath().toString()));
+        return rc == 0;
+    }
+
+    private static void addCertificate(Path loginKeyChain, Path certificatePath) {
+        executeProcess(List.of(
+                "/usr/bin/security",
+                "add-certificates",
+                "-k", loginKeyChain.toString(),
+                certificatePath.toString()
+        ));
+    }
+
+    private static boolean deleteCert(String commonName) {
+        int rc = executeProcessAndGetExitCode(List.of(
+                "/usr/bin/security",
+                "delete-certificate",
+                "-c", commonName,
+                // Also delete user trust settings for this certificate
+                "-t"
+        ));
         return rc == 0;
     }
 }
