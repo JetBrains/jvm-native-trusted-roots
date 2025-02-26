@@ -4,7 +4,10 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
+import com.sun.jna.ptr.PointerByReference;
+import org.jetbrains.annotations.Nullable;
 
+@SuppressWarnings("unused")
 public interface CoreFoundationExt extends Library {
     CoreFoundationExt INSTANCE = Native.load("CoreFoundation", CoreFoundationExt.class);
 
@@ -32,8 +35,6 @@ public interface CoreFoundationExt extends Library {
             Pointer keyCallBacks,
             Pointer valueCallBacks
     );
-
-    void CFShow(CoreFoundation.CFTypeRef obj);
 
     /**
      * Creates a new immutable array with the given values.
@@ -96,6 +97,7 @@ public interface CoreFoundationExt extends Library {
      * @see <a href="https://developer.apple.com/documentation/corefoundation/kcfbooleanfalse">https://developer.apple.com/documentation/corefoundation/kcfbooleanfalse</a>
      */
     CoreFoundation.CFBooleanRef kCFBooleanFalse = resolveBoolean("kCFBooleanFalse", false);
+
     /**
      * Boolean true value.
      * @see <a href="https://developer.apple.com/documentation/corefoundation/kcfbooleantrue">https://developer.apple.com/documentation/corefoundation/kcfbooleantrue</a>
@@ -109,5 +111,43 @@ public interface CoreFoundationExt extends Library {
             throw new IllegalStateException("Expected " + name + " to be " + expectedValue + ", but got " + cfBoolean.booleanValue());
         }
         return cfBoolean;
+    }
+
+    class CFArrayRefByReference extends PointerByReference {
+        public CFArrayRefByReference() {
+        }
+
+        public CFArrayRefByReference(CoreFoundation.CFArrayRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public CoreFoundation.CFArrayRef getArray() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new CoreFoundation.CFArrayRef(value);
+        }
+    }
+
+    class CFStringRefByReference extends PointerByReference {
+        public CFStringRefByReference() {
+        }
+
+        public CFStringRefByReference(CoreFoundation.CFStringRef value) {
+            super(value.getPointer());
+        }
+
+        @Nullable
+        public CoreFoundation.CFStringRef getStringRef() {
+            Pointer value = super.getValue();
+            if (value == null) {
+                return null;
+            }
+
+            return new CoreFoundation.CFStringRef(value);
+        }
     }
 }

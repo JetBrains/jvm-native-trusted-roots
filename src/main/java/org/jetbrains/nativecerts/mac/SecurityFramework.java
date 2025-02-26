@@ -5,6 +5,8 @@ import com.sun.jna.platform.mac.CoreFoundation;
 import com.sun.jna.ptr.PointerByReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFArrayRefByReference;
+import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFStringRefByReference;
 
 @SuppressWarnings("unused")
 public interface SecurityFramework extends Library {

@@ -4,6 +4,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
+import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFArrayRefByReference;
 
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
