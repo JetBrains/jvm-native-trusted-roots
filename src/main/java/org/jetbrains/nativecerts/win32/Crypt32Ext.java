@@ -61,6 +61,15 @@ public interface Crypt32Ext extends StdCallLibrary {
     int CERT_SYSTEM_STORE_UNPROTECTED_FLAG = 0x40000000;
     int CERT_SYSTEM_STORE_RELOCATE_FLAG = 0x80000000;
 
+    // Revocation flags for CertGetCertificateChain https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatechain
+    int CERT_CHAIN_REVOCATION_CHECK_END_CERT = 0x10000000;
+    int CERT_CHAIN_REVOCATION_CHECK_CHAIN = 0x20000000;
+    int CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT = 0x40000000;
+    int CERT_CHAIN_REVOCATION_CHECK_CACHE_ONLY = 0x80000000;
+
+    // for CertVerifyCertificateChainPolicy https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certverifycertificatechainpolicy
+    int CERT_CHAIN_POLICY_SSL = 4;
+
     Crypt32Ext INSTANCE = Native.load("Crypt32", Crypt32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
@@ -98,4 +107,31 @@ public interface Crypt32Ext extends StdCallLibrary {
             WinCrypt.HCRYPTPROV_LEGACY hCryptProv,
             int dwFlags,
             WTypes.LPWSTR pvPara);
+
+    /**
+     * The {@code CertCreateCertificateContext} function creates a certificate context from an encoded certificate.
+     * The created context is not persisted to a certificate store.
+     * The function makes a copy of the encoded certificate within the created context.
+     * @param dwCertEncodingType
+     *          [in] Specifies the type of encoding used. It is always acceptable to specify both the certificate and message
+     *          encoding types by combining them with a bitwise-OR operation as shown in the following example:
+     *          X509_ASN_ENCODING | PKCS_7_ASN_ENCODING. Currently, defined encoding types are:
+     *          X509_ASN_ENCODING PKCS_7_ASN_ENCODING
+     * @param pbCertEncoded
+     *          [in] A pointer to a buffer that contains the encoded certificate from which the context is to be created.
+     * @param cbCertEncoded
+     *          [in] The size, in bytes, of the {@code pbCertEncoded} buffer.
+     * @return
+     *          If the function succeeds, the function returns a pointer to a read-only {@link WinCrypt.CERT_CONTEXT}.
+     *          When you have finished using the certificate context, free it by calling the {@link com.sun.jna.platform.win32.Crypt32#CertFreeCertificateContext(WinCrypt.CERT_CONTEXT)} function.
+     *          If the function is unable to decode and create the certificate context, it returns NULL.
+     *          For extended error information, call {@link Native#getLastError()}.
+     *
+     * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certcreatecertificatecontext">MSDN</a>
+     */
+    WinCrypt.CERT_CONTEXT CertCreateCertificateContext(
+            int dwCertEncodingType,
+            byte[] pbCertEncoded,
+            int cbCertEncoded
+    );
 }

@@ -2,11 +2,13 @@ package org.jetbrains.nativecerts.win32;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.Crypt32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.WTypes;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinCrypt;
+import com.sun.jna.ptr.PointerByReference;
 import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
 
 import java.security.cert.X509Certificate;
@@ -44,12 +46,13 @@ public class Crypt32ExtUtil {
 
             if (LOGGER.isLoggable(Level.FINE)) {
                 StringBuilder message = new StringBuilder();
-                message.append("Received ").append(root.size()).append(" certificates from store ROOT / ").append(entry.getKey());
-                message.append("Received ").append(intermediates.size()).append(" certificates from store CA (Intermediates) / ").append(entry.getKey());
 
+                message.append("Received ").append(root.size()).append(" certificates from store ROOT / ").append(entry.getKey());
                 for (X509Certificate certificate : root) {
                     message.append("\n  ROOT/").append(entry.getKey()).append(": ").append(certificate.getSubjectX500Principal());
                 }
+
+                message.append("\nReceived ").append(intermediates.size()).append(" certificates from store CA (Intermediates) / ").append(entry.getKey());
                 for (X509Certificate certificate : intermediates) {
                     message.append("\n  CA/").append(entry.getKey()).append(": ").append(certificate.getSubjectX500Principal());
                 }
@@ -58,7 +61,18 @@ public class Crypt32ExtUtil {
             }
 
             result.addAll(root);
-            result.addAll(intermediates);
+
+            for (X509Certificate intermediate : intermediates) {
+                try {
+                    validateCertificate(intermediate.getEncoded());
+                    result.add(intermediate);
+                } catch (Throwable t) {
+                    LOGGER.log(
+                            Level.FINE,
+                            "Unable to validate whether certificate '" + intermediate.getSubjectX500Principal() + "' is trusted: " + t.getMessage(),
+                            t);
+                }
+            }
         }
 
         return result;
@@ -125,6 +139,69 @@ public class Crypt32ExtUtil {
             return result;
         } finally {
             CertCloseStore(hcertstore);
+        }
+    }
+
+    public static void validateCertificate(byte[] encodedCertificate) {
+        var certificateContext = Crypt32Ext.INSTANCE.CertCreateCertificateContext(
+                WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, encodedCertificate, encodedCertificate.length);
+        if (certificateContext == null) {
+            throw new Win32Exception(Native.getLastError());
+        }
+
+        try {
+            WinCrypt.CERT_CHAIN_PARA pChainPara = new WinCrypt.CERT_CHAIN_PARA();
+            pChainPara.cbSize = pChainPara.size();
+            pChainPara.RequestedUsage.dwType = WinCrypt.USAGE_MATCH_TYPE_AND;
+            pChainPara.RequestedUsage.Usage.cUsageIdentifier = 0;
+            pChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = null;
+
+            PointerByReference ppChainContext = new PointerByReference();
+            if (!Crypt32.INSTANCE.CertGetCertificateChain(
+                    null, certificateContext, null, null, pChainPara,
+                    Crypt32Ext.CERT_CHAIN_REVOCATION_CHECK_CACHE_ONLY,
+                    null, ppChainContext)) {
+                throw new Win32Exception(Native.getLastError());
+            }
+
+            if (ppChainContext.getValue() == null) {
+                throw new IllegalStateException("CertGetCertificateChain was successful, but returned chain context is null");
+            }
+
+            WinCrypt.CERT_CHAIN_CONTEXT pChainContext = Structure.newInstance(WinCrypt.CERT_CHAIN_CONTEXT.class, ppChainContext.getValue());
+            pChainContext.read();
+
+            if (pChainContext.cbSize != pChainContext.size()) {
+                throw new IllegalStateException("CertGetCertificateChain was successful, but returned chain context size is incorrect." +
+                        "returned cbSize is " + pChainContext.cbSize + ", but the structure size is " + pChainContext.size());
+            }
+
+            try {
+                WinCrypt.CERT_CHAIN_POLICY_PARA chainPolicyPara = new WinCrypt.CERT_CHAIN_POLICY_PARA();
+                chainPolicyPara.cbSize = chainPolicyPara.size();
+                chainPolicyPara.dwFlags = 0;
+
+                WinCrypt.CERT_CHAIN_POLICY_STATUS policyStatus = new WinCrypt.CERT_CHAIN_POLICY_STATUS();
+                policyStatus.dwError = 1; // extra check that CertVerifyCertificateChainPolicy actually sets this field
+                policyStatus.cbSize = policyStatus.size();
+
+                if (!Crypt32.INSTANCE.CertVerifyCertificateChainPolicy(
+                        new WTypes.LPSTR(Pointer.createConstant(Crypt32Ext.CERT_CHAIN_POLICY_SSL)),
+                        pChainContext, chainPolicyPara, policyStatus)) {
+                    throw new Win32Exception(Native.getLastError());
+                }
+
+                int dwError = policyStatus.dwError;
+                if (dwError != 0) {
+                    throw new Win32Exception(dwError, null, "CertVerifyCertificateChainPolicy failed to validate certificate with code " +
+                            Integer.toHexString(dwError) + ":\n" + Kernel32Util.formatMessage(dwError)) {
+                    };
+                }
+            } finally {
+                Crypt32.INSTANCE.CertFreeCertificateChain(pChainContext);
+            }
+        } finally {
+            Crypt32.INSTANCE.CertFreeCertificateContext(certificateContext);
         }
     }
 }
