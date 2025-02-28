@@ -28,6 +28,11 @@ import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderEx
 public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
+    private SecurityFrameworkUtil() {
+    }
+
+    final static String SECURITY_FRAMEWORK_LIBRARY_NAME = "Security";
+
     public static List<X509Certificate> getTrustedRoots(SecurityFramework.SecTrustSettingsDomain domain) {
         List<X509Certificate> result = copyMatchingCertificates(domain, cert -> isTrustedRoot(domain, cert));
 

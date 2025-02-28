@@ -9,6 +9,8 @@ public class CoreFoundationExtUtil {
     private CoreFoundationExtUtil() {
     }
 
+    final static String CORE_FOUNDATION_LIBRARY_NAME = "CoreFoundation";
+
     public static CoreFoundation.CFDictionaryRef createDictionary(Map<CFTypeRef, CFTypeRef> map) {
         int mapSize = map.size();
 

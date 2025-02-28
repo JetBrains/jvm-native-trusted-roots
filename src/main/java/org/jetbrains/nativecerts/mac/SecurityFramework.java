@@ -13,7 +13,7 @@ import static com.sun.jna.platform.mac.CoreFoundation.CFStringRef.createCFString
 @SuppressWarnings("unused")
 public interface SecurityFramework extends Library {
 
-    SecurityFramework INSTANCE = Native.load("Security", SecurityFramework.class);
+    SecurityFramework INSTANCE = Native.load(SecurityFrameworkUtil.SECURITY_FRAMEWORK_LIBRARY_NAME, SecurityFramework.class);
 
     /**
      * A dictionary key whose value is the item’s class.
@@ -511,7 +511,7 @@ public interface SecurityFramework extends Library {
     }
 
     private static CoreFoundation.CFStringRef resolveStringConstant(String name) {
-        Pointer pointer = Native.getNativeLibrary(SecurityFramework.INSTANCE).getGlobalVariableAddress(name);
+        Pointer pointer = NativeLibrary.getInstance(SecurityFrameworkUtil.SECURITY_FRAMEWORK_LIBRARY_NAME).getGlobalVariableAddress(name);
         return new CoreFoundation.CFStringRef(pointer.getPointer(0));
     }
 }

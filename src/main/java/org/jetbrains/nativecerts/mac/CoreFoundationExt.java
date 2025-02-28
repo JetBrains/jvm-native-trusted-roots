@@ -2,6 +2,7 @@ package org.jetbrains.nativecerts.mac;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 import com.sun.jna.ptr.PointerByReference;
@@ -9,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 @SuppressWarnings("unused")
 public interface CoreFoundationExt extends Library {
-    CoreFoundationExt INSTANCE = Native.load("CoreFoundation", CoreFoundationExt.class);
+    CoreFoundationExt INSTANCE = Native.load(CoreFoundationExtUtil.CORE_FOUNDATION_LIBRARY_NAME, CoreFoundationExt.class);
 
     /**
      * Returns the number of key-value pairs in a dictionary.
@@ -105,7 +106,7 @@ public interface CoreFoundationExt extends Library {
     CoreFoundation.CFBooleanRef kCFBooleanTrue = resolveBoolean("kCFBooleanTrue", true);
 
     private static CoreFoundation.CFBooleanRef resolveBoolean(String name, boolean expectedValue) {
-        Pointer pointer = Native.getNativeLibrary(CoreFoundation.INSTANCE).getGlobalVariableAddress(name);
+        Pointer pointer = NativeLibrary.getInstance(CoreFoundationExtUtil.CORE_FOUNDATION_LIBRARY_NAME).getGlobalVariableAddress(name);
         CoreFoundation.CFBooleanRef cfBoolean = new CoreFoundation.CFBooleanRef(pointer.getPointer(0));
         if (cfBoolean.booleanValue() != expectedValue) {
             throw new IllegalStateException("Expected " + name + " to be " + expectedValue + ", but got " + cfBoolean.booleanValue());
