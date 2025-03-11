@@ -34,4 +34,13 @@ public class CoreFoundationExtUtil {
                 null, array, new CoreFoundation.CFIndex(array.length), null
         );
     }
+
+    public static String getDescription(CFTypeRef cfTypeRef) {
+        CoreFoundation.CFStringRef description = CoreFoundation.INSTANCE.CFCopyDescription(cfTypeRef);
+        try {
+            return description.stringValue();
+        } finally {
+            CoreFoundation.INSTANCE.CFRelease(description);
+        }
+    }
 }

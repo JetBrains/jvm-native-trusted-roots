@@ -236,8 +236,8 @@ public class SecurityFrameworkUtil {
 
             if (LOGGER.isLoggable(Level.FINE)) {
                 try {
-                    CoreFoundation.CFStringRef cfStringRef = CoreFoundation.INSTANCE.CFCopyDescription(trustedSettingsArray);
-                    LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + cfStringRef.stringValue());
+                    String description = CoreFoundationExtUtil.getDescription(trustedSettingsArray);
+                    LOGGER.fine("Certificate '" + certificateDescription + "' trust settings:\n" + description);
                 } catch (Throwable t) {
                     LOGGER.warning(renderExceptionMessage("Unable to describe certificate trusted settings", t));
                 }
