@@ -114,7 +114,7 @@ public class SecurityFrameworkUtil {
                             continue;
                         }
                     } catch (Throwable predicateError) {
-                        String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                        String certificateDescription = CoreFoundationExtUtil.getDescription(secCertificateRef);
                         LOGGER.warning(renderExceptionMessage("Unable to check certificate '" + certificateDescription + "'", predicateError));
                         continue;
                     }
@@ -123,7 +123,7 @@ public class SecurityFrameworkUtil {
                 try {
                     result.add(getX509Certificate(secCertificateRef));
                 } catch (Throwable parsingError) {
-                    String certificateDescription = CoreFoundation.INSTANCE.CFCopyDescription(secCertificateRef).stringValue();
+                    String certificateDescription = CoreFoundationExtUtil.getDescription(secCertificateRef);
                     LOGGER.warning(renderExceptionMessage("Unable to parse certificate '" + certificateDescription + "'", parsingError));
                 }
             }
@@ -209,13 +209,11 @@ public class SecurityFrameworkUtil {
     public static boolean isTrustedRoot(SecurityFramework.SecTrustSettingsDomain domain, SecurityFramework.SecCertificateRef certificateRef) {
         boolean selfSignedCertificate = isSelfSignedCertificate(getX509Certificate(certificateRef));
         CFArrayRefByReference trustedSettingsRef = new CFArrayRefByReference();
-        CoreFoundation.CFStringRef descriptionRef = null;
 
         try {
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustSettingsCopyTrustSettings(certificateRef, domain, trustedSettingsRef);
 
-            descriptionRef = CoreFoundation.INSTANCE.CFCopyDescription(certificateRef);
-            String certificateDescription = descriptionRef.stringValue();
+            String certificateDescription = CoreFoundationExtUtil.getDescription(certificateRef);
 
             CoreFoundation.CFArrayRef trustedSettingsArray = trustedSettingsRef.getArray();
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc) && !SecurityFramework.OSStatus.errSecItemNotFound.equals(rc)) {
@@ -339,9 +337,6 @@ public class SecurityFrameworkUtil {
             // No matched constraints => not a trusted root
             return false;
         } finally {
-            if (descriptionRef != null) {
-                descriptionRef.release();
-            }
             CoreFoundation.CFArrayRef array = trustedSettingsRef.getArray();
             if (array != null) {
                 array.release();
