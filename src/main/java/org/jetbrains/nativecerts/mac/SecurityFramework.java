@@ -125,7 +125,7 @@ public interface SecurityFramework extends Library {
     CoreFoundation.CFTypeID SecTrustGetTypeID();
 
     CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
-    CoreFoundation.CFTypeID SEC_SEC_KEYCHAIN_REF_TYPE_ID = INSTANCE.SecKeychainGetTypeID();
+    CoreFoundation.CFTypeID SEC_KEYCHAIN_REF_TYPE_ID = INSTANCE.SecKeychainGetTypeID();
     CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
     CoreFoundation.CFTypeID SEC_TRUST_TYPE_ID = INSTANCE.SecTrustGetTypeID();
 
@@ -157,8 +157,8 @@ public interface SecurityFramework extends Library {
 
         public SecKeychainRef(Pointer p) {
             super(p);
-            if (!isTypeID(SEC_SEC_KEYCHAIN_REF_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to SecCertificateRef. Type ID: " + getTypeID());
+            if (!isTypeID(SEC_KEYCHAIN_REF_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to SecKeychainRef. Type ID: " + getTypeID());
             }
         }
     }
