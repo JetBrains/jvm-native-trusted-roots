@@ -44,7 +44,7 @@ public class SecurityFrameworkUtilTest {
 
     @Test
     public void enumerateSystemCertificates() {
-        List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.system);
+        List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getSystemTrustedRoots();
 
         System.out.println(trustedRoots.size());
         for (X509Certificate root : trustedRoots) {
@@ -72,7 +72,13 @@ public class SecurityFrameworkUtilTest {
     }
 
     @Test
-    public void addRealUserTrustedCertificate_ssl_policy() throws Exception {
+    public void addRealUserTrustedCertificate_ssl_policy_wrong() throws Exception {
+        Assume.assumeTrue(isManualTestingEnabled);
+        customUserTrustedCertificateTest("basic", "trustRoot", false, true);
+    }
+
+    @Test
+    public void addRealUserTrustedCertificate_ssl_policy_right() throws Exception {
         Assume.assumeTrue(isManualTestingEnabled);
         customUserTrustedCertificateTest("ssl", "trustRoot", true, true);
     }
@@ -97,7 +103,7 @@ public class SecurityFrameworkUtilTest {
             Thread.sleep(2000L);
 
             // Verify getTrustedRoots doesn't return client cert
-            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots();
             List<String> afterAddAliases = afterAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
             assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
             assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
@@ -134,7 +140,7 @@ public class SecurityFrameworkUtilTest {
 
         // remove just in case it was not cleaned up before
         deleteAllKnownCertificates();
-        List<X509Certificate> beforeAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+        List<X509Certificate> beforeAdd = SecurityFrameworkUtil.getTrustedRoots();
         List<String> beforeAddAliases = beforeAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
         assertThat(beforeAddAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS")));
         assertThat(beforeAddAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS")));
@@ -151,7 +157,7 @@ public class SecurityFrameworkUtilTest {
             addCertificate(loginKeyChain, intermediatePath);
 
             // verify both certs are trusted
-            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots();
             List<String> afterAddAliases = afterAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
             assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
             assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
@@ -164,7 +170,7 @@ public class SecurityFrameworkUtilTest {
             assertFalse(verifyCert(intermediatePath, null));
             assertFalse(verifyCert(getTestCertificatePath(), null));
 
-            List<X509Certificate> afterRootRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> afterRootRemoval = SecurityFrameworkUtil.getTrustedRoots();
             List<String> afterRootRemovalAliases = afterRootRemoval.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
             assertThat(afterRootRemovalAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS")));
             assertThat(afterRootRemovalAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS")));
@@ -202,7 +208,7 @@ public class SecurityFrameworkUtilTest {
         deleteAllKnownCertificates();
 
         try {
-            List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots();
             assertFalse(rootsBefore.contains(getTestCertificate()));
 
             Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
@@ -222,15 +228,16 @@ public class SecurityFrameworkUtilTest {
             String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
             Assert.assertTrue(trustSettings, trustSettings.contains("JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA"));
 
-            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots();
             assertEquals(shouldTrustCertificate, rootsAfter.contains(getTestCertificate()));
 
             assertTrue(removeTrustedCert(getTestCertificatePath()));
             // verify cert is async
             Thread.sleep(3000);
+
             Assert.assertFalse(verifyCert(getTestCertificatePath(), policy));
 
-            List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots();
             assertFalse(rootsAfterRemoval.contains(getTestCertificate()));
         } finally {
             deleteAllKnownCertificates();

@@ -1,15 +1,20 @@
 package org.jetbrains.nativecerts;
 
 import org.jetbrains.nativecerts.linux.LinuxTrustedCertificatesUtil;
-import org.jetbrains.nativecerts.mac.SecurityFramework;
 import org.jetbrains.nativecerts.mac.SecurityFrameworkUtil;
 import org.jetbrains.nativecerts.win32.Crypt32ExtUtil;
 
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.logging.Logger;
 
-import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.*;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isLinux;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isWindows;
+import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderExceptionMessage;
 
 public class NativeTrustedCertificates {
     private static final Logger LOGGER = Logger.getLogger(NativeTrustedCertificates.class.getName());
@@ -30,12 +35,8 @@ public class NativeTrustedCertificates {
             }
 
             if (isMac) {
-                List<X509Certificate> admin = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.admin);
-                List<X509Certificate> user = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-
-                Set<X509Certificate> result = new HashSet<>(admin);
-                result.addAll(user);
-                return result;
+                List<X509Certificate> admin = SecurityFrameworkUtil.getTrustedRoots();
+                return new HashSet<>(admin);
             }
 
             if (isWindows) {
