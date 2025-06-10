@@ -15,3 +15,7 @@ authorityKeyIdentifier=keyid:always,issuer:always
 #basicConstraints = critical,CA:true
 # So we do this instead.
 basicConstraints = CA:true
+
+[my_client]
+basicConstraints = critical,CA:FALSE
+extendedKeyUsage = clientAuth,emailProtection

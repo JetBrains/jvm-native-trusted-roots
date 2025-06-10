@@ -31,4 +31,19 @@ openssl x509 -req \
  -days 10950 \
  -sha256
 
-rm -f root.key root.srl test-intermediate-ca.csr intermediate.key
+openssl genrsa -out client.key 2048
+openssl req -new -sha256 -nodes -key client.key  \
+  -subj "/O=JETBRAINS/CN=JVM-CLIENT-CERT" -out test-client.csr
+
+openssl x509 -req \
+ -extensions my_client \
+ -extfile openssl.cnf \
+ -in test-client.csr \
+ -CA root.crt \
+ -CAkey root.key \
+ -CAcreateserial \
+ -out client.pem \
+ -days 100 \
+ -sha256
+
+rm -f root.key root.srl test-intermediate-ca.csr intermediate.key client.key test-client.csr

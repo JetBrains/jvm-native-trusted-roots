@@ -1,11 +1,13 @@
 package org.jetbrains.nativecerts.mac;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -72,13 +74,54 @@ public class SecurityFrameworkUtilTest {
     @Test
     public void addRealUserTrustedCertificate() throws Exception {
         Assume.assumeTrue(isManualTestingEnabled);
-        customUserTrustedCertificateTest(null, "trustRoot", true);
+        customUserTrustedCertificateTest(null, "trustRoot", true, true);
     }
 
     @Test
     public void addRealUserTrustedCertificate_ssl_policy() throws Exception {
         Assume.assumeTrue(isManualTestingEnabled);
-        customUserTrustedCertificateTest("ssl", "trustRoot", true);
+        customUserTrustedCertificateTest("ssl", "trustRoot", true, true);
+    }
+
+    @Test
+    @Ignore("Failing due to accepting client cert as a valid, " +
+            "fixed by calling SecPolicyCreateSSL(/* server */ true) " +
+            "instead of SecPolicyCreateSSL(false)")
+    public void skip_client_certificate() throws Exception {
+        Assume.assumeTrue(isManualTestingEnabled);
+
+        Path clientPath = getCertificatePath("/mock-ca/client.pem");
+        Path intermediatePath = getCertificatePath("/mock-ca/intermediate-ca.pem");
+
+        deleteAllKnownCertificates();
+
+        try {
+            Path loginKeyChain = getLoginKeyChain();
+            addTrustedCertificate(loginKeyChain, getTestCertificatePath());
+            addCertificate(loginKeyChain, intermediatePath);
+            addCertificate(loginKeyChain, clientPath);
+            Thread.sleep(2000L);
+
+            // Verify getTrustedRoots doesn't return client cert
+            List<X509Certificate> afterAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+            List<String> afterAddAliases = afterAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
+            assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS"));
+            assertThat(afterAddAliases, hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS"));
+            assertThat(afterAddAliases, not(hasItem("CN=JVM-CLIENT-CERT, O=JETBRAINS")));
+            // but it's still verifiable
+            assertTrue(verifyCert(clientPath, null));
+
+            // assert cleanup
+            assertTrue(deleteCert("JVM-CLIENT-CERT"));
+        } finally {
+            deleteAllKnownCertificates();
+        }
+    }
+
+    private static void deleteAllKnownCertificates() {
+        deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA");
+        deleteCert("JVM-CLIENT-CERT");
+        deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA");
     }
 
     @Test
@@ -86,7 +129,7 @@ public class SecurityFrameworkUtilTest {
         Assume.assumeTrue(isManualTestingEnabled);
 
         // see https://github.com/golang/go/issues/24084
-        customUserTrustedCertificateTest("ssl", "deny", false);
+        customUserTrustedCertificateTest("ssl", "deny", false, false);
     }
 
     @Test
@@ -96,20 +139,17 @@ public class SecurityFrameworkUtilTest {
         Path intermediatePath = getCertificatePath("/mock-ca/intermediate-ca.pem");
 
         // remove just in case it was not cleaned up before
-        removeTrustedCert(getTestCertificatePath());
-        deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA");
+        deleteAllKnownCertificates();
+        List<X509Certificate> beforeAdd = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
+        List<String> beforeAddAliases = beforeAdd.stream().map(crt -> crt.getSubjectX500Principal().toString()).toList();
+        assertThat(beforeAddAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA, O=JETBRAINS")));
+        assertThat(beforeAddAliases, not(hasItem("CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA, O=JETBRAINS")));
 
         try {
-            Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
+            Path loginKeyChain = getLoginKeyChain();
 
             // add root cert
-            List<String> args = List.of(
-                    "/usr/bin/security",
-                    "add-trusted-cert",
-                    "-k", loginKeyChain.toString(),
-                    getTestCertificatePath().toString()
-            );
-            executeProcess(args);
+            addTrustedCertificate(loginKeyChain, getTestCertificatePath());
 
             Thread.sleep(2000L);
 
@@ -138,21 +178,34 @@ public class SecurityFrameworkUtilTest {
             // assert cleanup
             assertTrue(deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA"));
         } finally {
-            removeTrustedCert(getTestCertificatePath());
-            deleteCert("JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA");
+            deleteAllKnownCertificates();
         }
+    }
+
+    private static void addTrustedCertificate(Path loginKeyChain, Path certificatePath) {
+        List<String> args = List.of(
+                "/usr/bin/security",
+                "add-trusted-cert",
+                "-k", loginKeyChain.toString(),
+                certificatePath.toString()
+        );
+        executeProcess(args);
+    }
+
+    private static @NotNull Path getLoginKeyChain() {
+        return Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
     }
 
     /**
      * @param policy Policy constraint (ssl, smime, codeSign, IPSec, iChat, basic, swUpdate, pkgSign, pkinitClient, pkinitServer, eap).
      * @param resultType trustRoot|trustAsRoot|deny|unspecified
      */
-    private void customUserTrustedCertificateTest(@Nullable String policy, String resultType, boolean shouldTrust) throws Exception {
-        Path loginKeyChain = Path.of(System.getProperty("user.home"), "Library/Keychains/login.keychain-db");
+    private void customUserTrustedCertificateTest(@Nullable String policy, String resultType, boolean shouldTrustCertificate, boolean shouldTrustPolicy) throws Exception {
+        Path loginKeyChain = getLoginKeyChain();
         assertTrue(Files.isRegularFile(loginKeyChain));
 
         // cleanup just in case it was imported before
-        removeTrustedCert(getTestCertificatePath());
+        deleteAllKnownCertificates();
 
         try {
             List<X509Certificate> rootsBefore = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
@@ -170,13 +223,13 @@ public class SecurityFrameworkUtilTest {
 
             // verify cert is async
             Thread.sleep(3000);
-            Assert.assertEquals(shouldTrust, verifyCert(getTestCertificatePath(), policy));
+            Assert.assertEquals(shouldTrustPolicy, verifyCert(getTestCertificatePath(), policy));
 
             String trustSettings = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "dump-trust-setting");
             Assert.assertTrue(trustSettings, trustSettings.contains("JVM-NATIVE-TRUSTED-ROOTS-MOCK-CA"));
 
             List<X509Certificate> rootsAfter = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
-            assertEquals(shouldTrust, rootsAfter.contains(getTestCertificate()));
+            assertEquals(shouldTrustCertificate, rootsAfter.contains(getTestCertificate()));
 
             assertTrue(removeTrustedCert(getTestCertificatePath()));
             // verify cert is async
@@ -186,8 +239,7 @@ public class SecurityFrameworkUtilTest {
             List<X509Certificate> rootsAfterRemoval = SecurityFrameworkUtil.getTrustedRoots(SecurityFramework.SecTrustSettingsDomain.user);
             assertFalse(rootsAfterRemoval.contains(getTestCertificate()));
         } finally {
-            // even if test fails we must remove trusted certificate
-            removeTrustedCert(getTestCertificatePath());
+            deleteAllKnownCertificates();
         }
     }
 
