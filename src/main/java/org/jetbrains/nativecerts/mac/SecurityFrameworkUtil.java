@@ -3,6 +3,7 @@ package org.jetbrains.nativecerts.mac;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils;
 import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFArrayRefByReference;
 
@@ -172,7 +173,8 @@ public class SecurityFrameworkUtil {
         return true;
     }
 
-    private static boolean validateCertificate(SecurityFramework.SecCertificateRef certificateRef) {
+    @Nullable
+    private static CoreFoundationExt.Error validateCertificate(SecurityFramework.SecCertificateRef certificateRef) {
         SecurityFramework.SecPolicyRef policy = null;
         SecurityFramework.SecTrustRefByReference secTrustRefByReference = null;
         CoreFoundation.CFArrayRef subjCerts = null;
@@ -185,11 +187,19 @@ public class SecurityFrameworkUtil {
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
                     subjCerts, policy, secTrustRefByReference);
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
-                LOGGER.warning("Failed to create trust object: " + rc);
-                return false;
+                String description = "Failed to create trust object: " + rc;
+                LOGGER.warning(description);
+                return rc.toError();
             }
 
-            return SecurityFramework.INSTANCE.SecTrustEvaluateWithError(secTrustRefByReference.getSecTrustRef(), null);
+            CoreFoundationExt.CFErrorRef.ByReference errorRef = new CoreFoundationExt.CFErrorRef.ByReference();
+            boolean trusted = SecurityFramework.INSTANCE.SecTrustEvaluateWithError(secTrustRefByReference.getSecTrustRef(), errorRef);
+            if (!trusted) {
+                CoreFoundationExt.CFErrorRef error = errorRef.getErrorRefValue();
+                return error.toError();
+            }
+
+            return null;
         } finally {
             if (policy != null) {
                 policy.release();
@@ -223,11 +233,11 @@ public class SecurityFrameworkUtil {
 
             if (trustedSettingsArray == null) {
                 // Trust record is null we need to verify the certificate first
-                boolean valid = validateCertificate(certificateRef);
-                if (valid) {
+                CoreFoundationExt.Error error = validateCertificate(certificateRef);
+                if (error == null) {
                     return true;
                 } else {
-                    LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings and failed to validate against trusted roots");
+                    LOGGER.fine("Certificate '" + certificateDescription + "' has no trust settings and failed to validate against trusted roots: " + error);
                     return false;
                 }
             }

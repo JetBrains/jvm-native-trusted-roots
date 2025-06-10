@@ -357,7 +357,7 @@ public interface SecurityFramework extends Library {
      * @param error An error pointer the method uses to return an error when trust evaluation fails. Set to nil to ignore the error.
      * @return true if the certificate is trusted; otherwise, false.
      */
-    boolean SecTrustEvaluateWithError(SecTrustRef trust, Pointer error);
+    boolean SecTrustEvaluateWithError(SecTrustRef trust, CoreFoundationExt.CFErrorRef.ByReference error);
 
     /**
      * Retrieves the keychain search list for a specified preference domain.
@@ -468,6 +468,14 @@ public interface SecurityFramework extends Library {
         @Override
         public String toString() {
             return getErrorMessageString();
+        }
+
+        public CoreFoundationExt.Error toError() {
+            return new CoreFoundationExt.Error(
+                    CoreFoundationExt.NSOSStatusErrorDomain,
+                    longValue(),
+                    getErrorMessageString()
+            );
         }
     }
 

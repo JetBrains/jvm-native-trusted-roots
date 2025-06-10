@@ -6,11 +6,150 @@ import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.mac.CoreFoundation;
 import com.sun.jna.ptr.PointerByReference;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 @SuppressWarnings("unused")
 public interface CoreFoundationExt extends Library {
     CoreFoundationExt INSTANCE = Native.load(CoreFoundationExtUtil.CORE_FOUNDATION_LIBRARY_NAME, CoreFoundationExt.class);
+
+    CoreFoundation.CFTypeID CFErrorGetTypeID();
+    CoreFoundation.CFTypeID ERROR_TYPE_ID = INSTANCE.CFErrorGetTypeID();
+
+    /**
+     * Returns the error domain for a given CFError.
+     *
+     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorgetdomain(_:)">https://developer.apple.com/documentation/corefoundation/cferrorgetdomain(_:)</a>
+     * @return The error domain for err. Ownership follows <a href="https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-SW1">The Get Rule</a>.
+     */
+    @NotNull
+    CoreFoundation.CFStringRef CFErrorGetDomain(CFErrorRef error);
+
+    /**
+     * Returns a human-presentable description for a given error.
+     *
+     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorcopydescription(_:)">https://developer.apple.com/documentation/corefoundation/cferrorcopydescription(_:)</a>
+     * @return A localized, human-presentable description of err. This function never returns NULL.
+     */
+    @NotNull
+    CoreFoundation.CFStringRef CFErrorCopyDescription(CFErrorRef err);
+
+    /**
+     * Returns the error code for a given CFError.
+     *
+     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorgetcode(_:)">https://developer.apple.com/documentation/corefoundation/cferrorgetcode(_:)</a>
+     * @return The error code of err.
+     */
+    CoreFoundation.CFIndex CFErrorGetCode(CFErrorRef err);
+
+    /**
+     * Mac OS 9/Carbon errors
+     *
+     * @see <a href="https://developer.apple.com/documentation/foundation/nsosstatuserrordomain">https://developer.apple.com/documentation/foundation/nsosstatuserrordomain</a>
+     */
+    String NSOSStatusErrorDomain = "NSOSStatusErrorDomain";
+
+    /**
+     * Unwrapped version of CFErrorRef without native references
+     */
+    record Error(
+            @NotNull
+            String domain,
+            @NotNull
+            Long code,
+            @NotNull
+            String description
+    ) {
+        @Override
+        public @NotNull String toString() {
+            return "Error{" +
+                   "domain=" + domain +
+                   ", code=" + code +
+                   ", description='" + description + '\'' +
+                   '}';
+        }
+    }
+
+    /**
+     * A CFError object encapsulates more rich and extensible error information
+     * than is possible using only an error code or error string.
+     *
+     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferror">https://developer.apple.com/documentation/corefoundation/cferror</a>
+     */
+    class CFErrorRef extends CoreFoundation.CFTypeRef {
+
+        /**
+         * Placeholder for a reference to a {@code CFErrorRef} object.
+         */
+        public static class ByReference extends PointerByReference {
+            public ByReference() {
+                this(null);
+            }
+
+            public ByReference(CFErrorRef value) {
+                super(value != null ? value.getPointer() : null);
+            }
+
+            @Override
+            public void setValue(Pointer value) {
+                if (value != null) {
+                    CoreFoundation.CFTypeID typeId = CoreFoundation.INSTANCE.CFGetTypeID(value);
+                    if (!ERROR_TYPE_ID.equals(typeId)) {
+                        throw new ClassCastException("Unable to cast to CFErrorRef. Type ID: " + typeId);
+                    }
+                }
+
+                super.setValue(value);
+            }
+
+            public CFErrorRef getErrorRefValue() {
+                Pointer value = super.getValue();
+                if (value == null) {
+                    return null;
+                }
+
+                return new CFErrorRef(value);
+            }
+        }
+
+        public CFErrorRef() {
+            super();
+        }
+
+        public CFErrorRef(Pointer p) {
+            super(p);
+            if (!isTypeID(ERROR_TYPE_ID)) {
+                throw new ClassCastException("Unable to cast to CFErrorRef. Type ID: " + getTypeID());
+            }
+        }
+
+        @NotNull
+        public String getDomain() {
+            CoreFoundation.CFStringRef domainRef = INSTANCE.CFErrorGetDomain(this);
+            return domainRef.stringValue();
+        }
+
+        @NotNull
+        public String getDescription() {
+            CoreFoundation.CFStringRef description = INSTANCE.CFErrorCopyDescription(this);
+            try {
+                return description.stringValue();
+            } finally {
+                CoreFoundation.INSTANCE.CFRelease(description);
+            }
+        }
+
+        @NotNull
+        public Long getCode() {
+            CoreFoundation.CFIndex errorCode = INSTANCE.CFErrorGetCode(this);
+            return errorCode.longValue();
+        }
+
+        @NotNull
+        public Error toError() {
+            return new Error(getDomain(), getCode(), getDescription());
+        }
+    }
 
     /**
      * Returns the number of key-value pairs in a dictionary.
@@ -70,7 +209,7 @@ public interface CoreFoundationExt extends Library {
      *            the callbacks for the array to use on each value in the
      *            collection. The retain callback is used within this function, for
      *            example, to retain all of the new values from the {@code values} C
-     *            array. A copy of the contents of the callbacks structure is made,
+     *            array. A copy of the contents of the callbacks structure is made
      *            so that a pointer to a structure on the stack can be passed in or
      *            can be reused for multiple collection creations.
      *            <p>
