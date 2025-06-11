@@ -3,7 +3,6 @@ package org.jetbrains.nativecerts.mac;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
@@ -41,11 +40,6 @@ public class SecurityFrameworkUtilTest {
     @BeforeClass
     public static void beforeClass() {
         Assume.assumeTrue("Requires Mac OS X", isMac);
-    }
-
-    @After
-    public void afterTest() {
-        assertEquals(0, loggingRule.numberOfWarningsOrAbove());
     }
 
     @Test

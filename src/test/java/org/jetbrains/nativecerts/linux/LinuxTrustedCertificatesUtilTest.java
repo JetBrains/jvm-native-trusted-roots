@@ -21,7 +21,5 @@ public class LinuxTrustedCertificatesUtilTest {
 
         Collection<X509Certificate> list = LinuxTrustedCertificatesUtil.getSystemCertificates();
         Assert.assertTrue(String.valueOf(list.size()), list.size() > 100);
-
-        Assert.assertEquals(0, loggingRule.numberOfWarningsOrAbove());
     }
 }

@@ -15,6 +15,7 @@ public class NativeCertsSetupLoggingRuleTest {
         Logger logger = Logger.getLogger(NativeCertsSetupLoggingRuleTest.class.getName());
         logger.warning("WARNING");
         logger.severe("ERROR");
-        Assert.assertEquals(2, loggingRule.numberOfWarningsOrAbove());
+        Assert.assertEquals(2, NativeCertsTestLogHandler.numberOfWarningsOrAbove());
+        NativeCertsTestLogHandler.reset();
     }
 }

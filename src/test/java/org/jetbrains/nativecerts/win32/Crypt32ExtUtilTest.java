@@ -3,7 +3,6 @@ package org.jetbrains.nativecerts.win32;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinError;
 import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
@@ -35,11 +34,6 @@ public class Crypt32ExtUtilTest {
     @BeforeClass
     public static void beforeClass() {
         Assume.assumeTrue("Requires Windows", isWindows);
-    }
-
-    @After
-    public void afterTest() {
-        assertEquals(0, loggingRule.numberOfWarningsOrAbove());
     }
 
     /**
