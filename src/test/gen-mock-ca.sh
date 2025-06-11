@@ -20,6 +20,10 @@ openssl genrsa -out intermediate.key 2048
 openssl req -new -sha256 -nodes -key intermediate.key  \
   -subj "/O=JETBRAINS/CN=JVM-NATIVE-TRUSTED-ROOTS-MOCK-INTERMEDIATE-CA" -out test-intermediate-ca.csr
 
+# Short-lived intermediate cert lifetime is required for apple checks
+# https://support.apple.com/en-au/102028
+# but looks like "This change will not affect certificates issued from user-added or administrator-added Root CAs."
+# is false for intermediate certs
 openssl x509 -req \
  -extensions v3_ca \
  -extfile openssl.cnf \
@@ -28,7 +32,7 @@ openssl x509 -req \
  -CAkey root.key \
  -CAcreateserial \
  -out intermediate-ca.pem \
- -days 10950 \
+ -days 100 \
  -sha256
 
 openssl genrsa -out client.key 2048

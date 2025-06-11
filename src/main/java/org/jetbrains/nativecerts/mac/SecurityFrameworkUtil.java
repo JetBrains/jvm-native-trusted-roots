@@ -29,6 +29,13 @@ import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.renderEx
 public class SecurityFrameworkUtil {
     private final static Logger LOGGER = Logger.getLogger(SecurityFrameworkUtil.class.getName());
 
+    public static final String SERVER_POLICY_PROPERTY = "org.jetbrains.nativecerts.mac.server_policy";
+    /**
+     * "server" policy should be used for evaluating certificates, but previously it was not.
+     * This option is to retain compatibility.
+     */
+    private final static boolean ourIsServerPolicy = Boolean.parseBoolean(System.getProperty(SERVER_POLICY_PROPERTY, "true"));
+
     private SecurityFrameworkUtil() {
     }
 
@@ -183,7 +190,13 @@ public class SecurityFrameworkUtil {
 
             secTrustRefByReference = new SecurityFramework.SecTrustRefByReference();
 
-            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(false, null);
+            if (!ourIsServerPolicy) {
+                LOGGER.warning(
+                        "Using 'client' policy for certificate validation, this is not recommended. " +
+                        "Drop setting of '" + SERVER_POLICY_PROPERTY + "' property from JVM options to use 'server' policy by default.");
+            }
+
+            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(ourIsServerPolicy, null);
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
                     subjCerts, policy, secTrustRefByReference);
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
