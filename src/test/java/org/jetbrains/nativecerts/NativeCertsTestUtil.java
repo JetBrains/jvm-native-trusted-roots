@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
@@ -18,14 +19,11 @@ public class NativeCertsTestUtil {
     public static final boolean isManualTestingEnabled = toBooleanChecked(System.getProperty("manual.test", "false"));
 
     private static boolean toBooleanChecked(String value) {
-        switch (value) {
-            case "true":
-                return true;
-            case "false":
-                return false;
-            default:
-                throw new IllegalArgumentException("Illegal boolean string, use only 'true' or 'false': " + value);
-        }
+        return switch (value) {
+            case "true" -> true;
+            case "false" -> false;
+            default -> throw new IllegalArgumentException("Illegal boolean string, use only 'true' or 'false': " + value);
+        };
     }
 
     public static Path getTestCertificatePath() {
@@ -35,10 +33,16 @@ public class NativeCertsTestUtil {
 
     public static @NotNull Path getCertificatePath(String certName) {
         try {
-            Path path = Path.of(Objects.requireNonNull(NativeCertsTestUtil.class.getResource(certName)).toURI());
+            URL resource = NativeCertsTestUtil.class.getResource(certName);
+            if (resource == null) {
+                throw new IllegalStateException("Resource not found: " + certName);
+            }
+
+            Path path = Path.of(resource.toURI());
             if (!Files.isRegularFile(path)) {
                 throw new IllegalStateException("Path not found: " + path);
             }
+
             return path;
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
