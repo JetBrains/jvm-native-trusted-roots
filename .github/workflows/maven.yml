@@ -46,7 +46,10 @@ jobs:
       run: mvn -B package --file pom.xml
 
     - name: Upload artifact
+      # Publish packages only on one runner
+      if: runner.os == 'Linux'
       uses: actions/upload-artifact@v4
       with:
-        name: package
+        name: jars
         path: target/*.jar
+        if-no-files-found: 'error'
