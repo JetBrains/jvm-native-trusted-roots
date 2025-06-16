@@ -30,6 +30,8 @@ If something goes wrong on user's machine, it's possible to gather all debug log
 
 ## Testing
 
+Run `./src/test/gen-mock-ca.sh` before running tests locally
+
 Some tests on Windows/Mac require a user to confirm modification of the trust store, so please run tests locally with system property `manual.test` set to `true`:
 
 ```
