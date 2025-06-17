@@ -47,6 +47,35 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>buildnumber-maven-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <id>validate-create</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>create</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>create-metadata</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>create-metadata</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- Install/Deploy metadata to Maven repository -->
+                    <!-- https://www.mojohaus.org/buildnumber-maven-plugin/create-metadata-mojo.html#attach -->
+                    <attach>true</attach>
+                    <doCheck>false</doCheck>
+                    <doUpdate>false</doUpdate>
+                </configuration>
+            </plugin>
+
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
@@ -54,7 +83,17 @@
                     <archive>
                         <manifestEntries>
                             <Automatic-Module-Name>org.jetbrains.nativecerts</Automatic-Module-Name>
+                            <Build-Time>${maven.build.timestamp}</Build-Time>
                         </manifestEntries>
+                        <manifestSections>
+                            <manifestSection>
+                                <name>Versions</name>
+                                <manifestEntries>
+                                    <Implementation-Version>${project.version}</Implementation-Version>
+                                    <Implementation-SCM-Revision>${buildNumber}</Implementation-SCM-Revision>
+                                </manifestEntries>
+                            </manifestSection>
+                        </manifestSections>
                     </archive>
                 </configuration>
             </plugin>
