@@ -36,11 +36,28 @@ jobs:
         run: |
           mvn -B versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false
 
+      - name: Write temporary Maven settings.xml
+        run: |
+          mkdir -p "${HOME}/.m2"
+          cat > "${HOME}/.m2/settings.xml" <<'EOF'
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>intellij-dependencies</id>
+                <username>${username}</username>
+                <password>${password}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
       - name: Deploy to external Maven repository
         run: |
           mvn -B deploy -DrepositoryUrl="$MAVEN_REPOSITORY_URL" \
-                         -Dusername="$MAVEN_USERNAME" \
-                         -Dpassword="$MAVEN_PASSWORD"
+                        -Dusername="$MAVEN_USERNAME" \
+                        -Dpassword="$MAVEN_PASSWORD"
 
       - name: Create Git tag
         run: |
