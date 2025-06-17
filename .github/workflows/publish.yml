@@ -7,11 +7,12 @@ permissions:
   contents: write             # push tag
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
+    environment: Publish
 
     env:
-      # ---- External Maven repository credentials (add these in repo secrets) ----
+      # secrets from https://jetbrains.team/extensions/installedApplications/jvm-native-trusted-roots%20publish%20from%20github-3XEWwf2yY05P/permanent-tokens
       MAVEN_USERNAME:       ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD:       ${{ secrets.MAVEN_PASSWORD }}
       MAVEN_REPOSITORY_URL: https://packages.jetbrains.team/maven/p/ij/intellij-dependencies
