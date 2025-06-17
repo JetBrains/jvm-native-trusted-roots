@@ -1,0 +1,50 @@
+name: Publish
+
+on:
+  workflow_dispatch:          # allow manual release
+
+permissions:
+  contents: write             # push tag
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      # ---- External Maven repository credentials (add these in repo secrets) ----
+      MAVEN_USERNAME:       ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_PASSWORD:       ${{ secrets.MAVEN_PASSWORD }}
+      MAVEN_REPOSITORY_URL: https://packages.jetbrains.team/maven/p/ij/intellij-dependencies
+      # ---- Version for this build ------------------------------------------------
+      NEW_VERSION:          1.1.${{ github.run_number }}
+
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # needed to push tags
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: corretto
+          cache: maven
+
+      - name: Set project version
+        run: |
+          mvn -B versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false
+
+      - name: Deploy to external Maven repository
+        run: |
+          mvn -B deploy -DrepositoryUrl="$MAVEN_REPOSITORY_URL" \
+                         -Dusername="$MAVEN_USERNAME" \
+                         -Dpassword="$MAVEN_PASSWORD"
+
+      - name: Create Git tag
+        run: |
+          git tag "v$NEW_VERSION"
+
+      - name: Push tag
+        run: |
+          git push origin "v$NEW_VERSION"
