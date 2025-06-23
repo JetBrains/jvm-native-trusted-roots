@@ -193,7 +193,15 @@ public class SecurityFrameworkUtil {
 
             secTrustRefByReference = new SecurityFramework.SecTrustRefByReference();
 
-            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(false, null);
+            // Why server == false?
+            // When server == true, Apple stack enable more strict processing of certificates
+            // See
+            //   https://discussions.apple.com/thread/254684451
+            //   https://discussions.apple.com/thread/254960840
+            //   https://www.michalspacek.com/validity-period-of-https-certificates-issued-from-a-user-added-ca-is-essentially-2-years
+            // This leads to returning some non-server certificates as trusted,
+            // but the real TLS stack will check basicConstraints/extendedKeyUsage anyway.
+            policy = SecurityFramework.INSTANCE.SecPolicyCreateSSL(/* server */ false, /* hostname */ null);
             SecurityFramework.OSStatus rc = SecurityFramework.INSTANCE.SecTrustCreateWithCertificates(
                     subjCerts, policy, secTrustRefByReference);
             if (!SecurityFramework.OSStatus.errSecSuccess.equals(rc)) {
