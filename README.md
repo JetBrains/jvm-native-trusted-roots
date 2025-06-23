@@ -13,12 +13,6 @@ Retrieves trusted certificates from the operating system using platform-specific
 
 See javadoc at [NativeTrustedCertificates.java](https://github.com/JetBrains/jvm-native-trusted-roots/blob/trunk/src/main/java/org/jetbrains/nativecerts/NativeTrustedCertificates.java)
 
-## Compatibility flags
-
-* Previously intermediate certificates were validated without explicitly specifying "server" policy \
-  See https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)
-  Now they are. To revert to the previous behavior, pass `-Dorg.jetbrains.nativecerts.mac.server_policy=false` in the JVM options.
-
 ## On-site diagnostics
 
 If something goes wrong on user's machine, it's possible to gather all debug logging running a special CLI utility:
