@@ -34,4 +34,4 @@ mvn package -Dmanual.test=true
 
 ## Releasing a new version (JetBrains internal only)
 
-Run job at [Publish jvm-native-trusted-roots @ Space](https://jetbrains.team/p/ij/automation/jobs/history/1ydHvJ2EWAKP)
+Run ['Publish'](https://github.com/JetBrains/jvm-native-trusted-roots/actions/workflows/publish.yml) workflow.
