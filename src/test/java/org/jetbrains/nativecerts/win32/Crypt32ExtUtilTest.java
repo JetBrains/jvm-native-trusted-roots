@@ -38,7 +38,7 @@ public class Crypt32ExtUtilTest {
     public void rejectsUntrustedCertificateWithoutChangingStores() throws Exception {
         var exception = assertThrows(WindowsCertificateException.class,
                 () -> Crypt32ExtUtil.validateCertificate(getTestCertificate().getEncoded()));
-        assertEquals(0x800B0109, exception.getErrorCode());
+        assertEquals(Crypt32Ext.CERT_E_UNTRUSTEDROOT, exception.getErrorCode());
     }
 
     @Test
@@ -78,7 +78,7 @@ public class Crypt32ExtUtilTest {
 
         WindowsCertificateException notTrustedException = assertThrows(WindowsCertificateException.class,
                 () -> Crypt32ExtUtil.validateCertificate(encoded));
-        assertEquals(0x800B0109, notTrustedException.getErrorCode());
+        assertEquals(Crypt32Ext.CERT_E_UNTRUSTEDROOT, notTrustedException.getErrorCode());
 
         // cleanup just in case it was imported before
         removeTrustedCert(sha1);
@@ -157,7 +157,7 @@ public class Crypt32ExtUtilTest {
             assertFalse(rootsAfterRootRemoval.contains(intermediateCertificate));
             var noTrustedRoot = assertThrows(WindowsCertificateException.class,
                     () -> Crypt32ExtUtil.validateCertificate(intermediateEncoded));
-            assertEquals(0x800B0109, noTrustedRoot.getErrorCode());
+            assertEquals(Crypt32Ext.CERT_E_UNTRUSTEDROOT, noTrustedRoot.getErrorCode());
 
             // Remove intermediate too
             assertTrue(removeTrustedCert(sha1Intermediate, "CA"));

@@ -16,10 +16,14 @@ import static java.lang.foreign.ValueLayout.JAVA_BYTE;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static org.jetbrains.nativecerts.NativeCertsTestUtil.getTestCertificate;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
-import static org.jetbrains.nativecerts.mac.CoreFoundationExt.*;
+import static org.jetbrains.nativecerts.mac.CoreFoundationExtUtil.*;
 import static org.jetbrains.nativecerts.mac.SecurityFramework.*;
 import static org.junit.Assert.*;
 
+/**
+ * Tests of the trust settings interpretation ({@link SecurityFrameworkUtil#matchesTrustSettings}) with synthetic
+ * usage constraints dictionaries, and of the bindings themselves. These tests do not modify any keychain.
+ */
 public class SecurityFrameworkBindingsTest {
     @BeforeClass
     public static void requireMacOS() {
@@ -28,7 +32,8 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void emptySettingsKeepDefaultTrust() {
-        var settings = createArray();
+        // "An empty trust settings array means always trust this certificate"
+        MemorySegment settings = createArray();
         try {
             assertTrue(SecurityFrameworkUtil.matchesTrustSettings(settings, true));
         } finally {
@@ -38,17 +43,18 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void defaultResultRequiresSelfSignedCertificate() {
+        // missing kSecTrustSettingsResult => kSecTrustSettingsResultTrustRoot, valid only for a self-signed certificate
         assertTrue(matches(Map.of(), true));
         assertFalse(matches(Map.of(), false));
     }
 
     @Test
     public void acceptsOnlyTrustRootResult() {
-        for (long result = 0; result <= 4; result++) {
-            var number = CoreFoundationExtTest.number(result);
+        for (long result = kSecTrustSettingsResultInvalid; result <= kSecTrustSettingsResultUnspecified; result++) {
+            MemorySegment number = CoreFoundationExtTest.number(result);
             try {
-                assertEquals(result == TRUST_ROOT, matches(Map.of(TRUST_SETTINGS_RESULT, number), true));
-                assertFalse(matches(Map.of(TRUST_SETTINGS_RESULT, number), false));
+                assertEquals(result == kSecTrustSettingsResultTrustRoot, matches(Map.of(kSecTrustSettingsResult, number), true));
+                assertFalse(matches(Map.of(kSecTrustSettingsResult, number), false));
             } finally {
                 release(number);
             }
@@ -57,9 +63,9 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void rejectsUnknownConstraints() {
-        var unknownKey = createString("Unknown trust constraint");
+        MemorySegment unknownKey = createString("Unknown trust constraint");
         try {
-            assertFalse(matches(Map.of(unknownKey, TRUE), true));
+            assertFalse(matches(Map.of(unknownKey, CoreFoundationExt.kCFBooleanTrue), true));
         } finally {
             release(unknownKey);
         }
@@ -67,12 +73,17 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void acceptsSslPolicyAndRejectsBasicPolicy() {
-        var ssl = (MemorySegment) POLICY_CREATE_SSL.invoke((byte) 0, NULL);
-        var security = new NativeLibrary("/System/Library/Frameworks/Security.framework/Security");
-        var basic = (MemorySegment) security.function("SecPolicyCreateBasicX509", of(ADDRESS)).invoke();
+        MemorySegment ssl = requireNonNull(SecPolicyCreateSSL(false, null));
+        NativeLibrary security = new NativeLibrary(SECURITY_FRAMEWORK_LIBRARY_PATH);
+        MemorySegment basic;
         try {
-            assertTrue(matches(Map.of(TRUST_SETTINGS_POLICY, ssl), true));
-            assertFalse(matches(Map.of(TRUST_SETTINGS_POLICY, basic), true));
+            basic = (MemorySegment) security.downcall("SecPolicyCreateBasicX509", of(ADDRESS)).invokeExact();
+        } catch (Throwable e) {
+            throw new AssertionError(e);
+        }
+        try {
+            assertTrue(matches(Map.of(kSecTrustSettingsPolicy, ssl), true));
+            assertFalse(matches(Map.of(kSecTrustSettingsPolicy, basic), true));
         } finally {
             release(ssl);
             release(basic);
@@ -81,9 +92,9 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void rejectsMalformedResultWithoutNativeTypeConfusion() {
-        var string = createString("Not a number");
+        MemorySegment string = createString("Not a number");
         try {
-            assertThrows(ClassCastException.class, () -> matches(Map.of(TRUST_SETTINGS_RESULT, string), true));
+            assertThrows(ClassCastException.class, () -> matches(Map.of(kSecTrustSettingsResult, string), true));
         } finally {
             release(string);
         }
@@ -91,17 +102,18 @@ public class SecurityFrameworkBindingsTest {
 
     @Test
     public void rejectsUntrustedCertificateWithoutChangingKeychains() throws Exception {
-        var coreFoundation = new NativeLibrary("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
-        var security = new NativeLibrary("/System/Library/Frameworks/Security.framework/Security");
-        var createData = coreFoundation.function("CFDataCreate", of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
-        var createCertificate = security.function("SecCertificateCreateWithData", of(ADDRESS, ADDRESS, ADDRESS));
-        try (var arena = Arena.ofConfined()) {
-            var bytes = getTestCertificate().getEncoded();
-            var data = requireNonNull((MemorySegment) createData.invoke(NULL,
+        NativeLibrary coreFoundation = new NativeLibrary(CoreFoundationExt.CORE_FOUNDATION_LIBRARY_PATH);
+        NativeLibrary security = new NativeLibrary(SECURITY_FRAMEWORK_LIBRARY_PATH);
+        var CFDataCreate = coreFoundation.downcall("CFDataCreate", of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
+        var SecCertificateCreateWithData = security.downcall("SecCertificateCreateWithData", of(ADDRESS, ADDRESS, ADDRESS));
+        try (Arena arena = Arena.ofConfined()) {
+            byte[] bytes = getTestCertificate().getEncoded();
+            MemorySegment data = requireNonNull((MemorySegment) CFDataCreate.invokeExact(NULL,
                     arena.allocateFrom(JAVA_BYTE, bytes), (long) bytes.length));
             try {
-                var certificate = requireNonNull((MemorySegment) createCertificate.invoke(NULL, data));
+                MemorySegment certificate = requireNonNull((MemorySegment) SecCertificateCreateWithData.invokeExact(NULL, data));
                 try {
+                    requireType(certificate, SEC_CERTIFICATE_TYPE_ID);
                     assertFalse(SecurityFrameworkUtil.isTrustedRoot(certificate));
                 } finally {
                     release(certificate);
@@ -109,13 +121,18 @@ public class SecurityFrameworkBindingsTest {
             } finally {
                 release(data);
             }
+        } catch (Throwable e) {
+            if (e instanceof Exception exception) {
+                throw exception;
+            }
+            throw new AssertionError(e);
         }
     }
 
     private static boolean matches(Map<MemorySegment, MemorySegment> constraints, boolean selfSigned) {
-        var dictionary = createDictionary(constraints);
+        MemorySegment dictionary = createDictionary(constraints);
         try {
-            var settings = createArray(dictionary);
+            MemorySegment settings = createArray(dictionary);
             try {
                 return SecurityFrameworkUtil.matchesTrustSettings(settings, selfSigned);
             } finally {
