@@ -1,7 +1,5 @@
 package org.jetbrains.nativecerts.win32;
 
-import com.sun.jna.platform.win32.Win32Exception;
-import com.sun.jna.platform.win32.WinError;
 import org.jetbrains.nativecerts.NativeCertsSetupLoggingRule;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -36,6 +34,27 @@ public class Crypt32ExtUtilTest {
         Assume.assumeTrue("Requires Windows", isWindows);
     }
 
+    @Test
+    public void rejectsUntrustedCertificateWithoutChangingStores() throws Exception {
+        var exception = assertThrows(WindowsCertificateException.class,
+                () -> Crypt32ExtUtil.validateCertificate(getTestCertificate().getEncoded()));
+        assertEquals(0x800B0109, exception.getErrorCode());
+    }
+
+    @Test
+    public void capturesErrorForInvalidCertificate() {
+        var exception = assertThrows(WindowsCertificateException.class,
+                () -> Crypt32ExtUtil.validateCertificate(new byte[]{1, 2, 3}));
+        assertTrue(exception.getErrorCode() != 0);
+        assertTrue(exception.getMessage().contains("CertCreateCertificateContext"));
+    }
+
+    @Test
+    public void missingStoreReturnsEmptyList() {
+        assertTrue(Crypt32ExtUtil.gatherEnterpriseCertsForLocation(
+                Crypt32Ext.CERT_SYSTEM_STORE_CURRENT_USER, "JVM_NATIVE_TRUSTED_ROOTS_MISSING_STORE").isEmpty());
+    }
+
     /**
      * Mostly dumps current custom certificates, for a manual review and check that there is no failure
      */
@@ -57,8 +76,9 @@ public class Crypt32ExtUtilTest {
         byte[] encoded = getTestCertificate().getEncoded();
         String sha1 = sha1hex(encoded);
 
-        Win32Exception notTrustedException = assertThrows(Win32Exception.class, () -> Crypt32ExtUtil.validateCertificate(encoded));
-        assertEquals(WinError.CERT_E_UNTRUSTEDROOT, notTrustedException.getErrorCode());
+        WindowsCertificateException notTrustedException = assertThrows(WindowsCertificateException.class,
+                () -> Crypt32ExtUtil.validateCertificate(encoded));
+        assertEquals(0x800B0109, notTrustedException.getErrorCode());
 
         // cleanup just in case it was imported before
         removeTrustedCert(sha1);
@@ -135,8 +155,9 @@ public class Crypt32ExtUtilTest {
             Collection<X509Certificate> rootsAfterRootRemoval = Crypt32ExtUtil.getCustomTrustedRootCertificates();
             assertFalse(rootsAfterRootRemoval.contains(rootCertificate));
             assertFalse(rootsAfterRootRemoval.contains(intermediateCertificate));
-            var noTrustedRoot = assertThrows(Win32Exception.class, () -> Crypt32ExtUtil.validateCertificate(intermediateEncoded));
-            assertEquals(WinError.CERT_E_UNTRUSTEDROOT, noTrustedRoot.getErrorCode());
+            var noTrustedRoot = assertThrows(WindowsCertificateException.class,
+                    () -> Crypt32ExtUtil.validateCertificate(intermediateEncoded));
+            assertEquals(0x800B0109, noTrustedRoot.getErrorCode());
 
             // Remove intermediate too
             assertTrue(removeTrustedCert(sha1Intermediate, "CA"));

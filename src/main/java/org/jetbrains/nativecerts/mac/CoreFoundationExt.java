@@ -1,293 +1,201 @@
 package org.jetbrains.nativecerts.mac;
 
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import com.sun.jna.NativeLibrary;
-import com.sun.jna.Pointer;
-import com.sun.jna.platform.mac.CoreFoundation;
-import com.sun.jna.ptr.PointerByReference;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.nativecerts.NativeLibrary;
 
-@SuppressWarnings("unused")
-public interface CoreFoundationExt extends Library {
-    CoreFoundationExt INSTANCE = Native.load(CoreFoundationExtUtil.CORE_FOUNDATION_LIBRARY_NAME, CoreFoundationExt.class);
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
-    CoreFoundation.CFTypeID CFErrorGetTypeID();
-    CoreFoundation.CFTypeID ERROR_TYPE_ID = INSTANCE.CFErrorGetTypeID();
+import static java.lang.foreign.FunctionDescriptor.of;
+import static java.lang.foreign.FunctionDescriptor.ofVoid;
+import static java.lang.foreign.MemorySegment.NULL;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
+import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 
-    /**
-     * Returns the error domain for a given CFError.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorgetdomain(_:)">https://developer.apple.com/documentation/corefoundation/cferrorgetdomain(_:)</a>
-     * @return The error domain for err. Ownership follows <a href="https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-SW1">The Get Rule</a>.
-     */
-    @NotNull
-    CoreFoundation.CFStringRef CFErrorGetDomain(CFErrorRef error);
+final class CoreFoundationExt {
+    private static final NativeLibrary LIBRARY = new NativeLibrary(
+            "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
+    private static final int UTF8 = 0x08000100;
+    private static final NativeLibrary.Function RELEASE = LIBRARY.function("CFRelease", ofVoid(ADDRESS));
+    private static final NativeLibrary.Function GET_TYPE_ID = LIBRARY.function("CFGetTypeID", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function EQUAL = LIBRARY.function("CFEqual", of(JAVA_BYTE, ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function COPY_DESCRIPTION = LIBRARY.function("CFCopyDescription", of(ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function ARRAY_CREATE = LIBRARY.function("CFArrayCreate",
+            of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function ARRAY_COUNT = LIBRARY.function("CFArrayGetCount", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function ARRAY_VALUE = LIBRARY.function("CFArrayGetValueAtIndex", of(ADDRESS, ADDRESS, JAVA_LONG));
+    private static final NativeLibrary.Function DICTIONARY_CREATE = LIBRARY.function("CFDictionaryCreate",
+            of(ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function DICTIONARY_COUNT = LIBRARY.function("CFDictionaryGetCount", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function DICTIONARY_VALUE = LIBRARY.function("CFDictionaryGetValue", of(ADDRESS, ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function STRING_CREATE = LIBRARY.function("CFStringCreateWithBytes",
+            of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, JAVA_BYTE));
+    private static final NativeLibrary.Function STRING_LENGTH = LIBRARY.function("CFStringGetLength", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function STRING_MAXIMUM_SIZE = LIBRARY.function("CFStringGetMaximumSizeForEncoding",
+            of(JAVA_LONG, JAVA_LONG, JAVA_INT));
+    private static final NativeLibrary.Function STRING_GET_C_STRING = LIBRARY.function("CFStringGetCString",
+            of(JAVA_BYTE, ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT));
+    private static final NativeLibrary.Function NUMBER_VALUE = LIBRARY.function("CFNumberGetValue", of(JAVA_BYTE, ADDRESS, JAVA_INT, ADDRESS));
+    private static final NativeLibrary.Function DATA_LENGTH = LIBRARY.function("CFDataGetLength", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function DATA_BYTES = LIBRARY.function("CFDataGetBytePtr", of(ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function ERROR_DOMAIN = LIBRARY.function("CFErrorGetDomain", of(ADDRESS, ADDRESS));
+    private static final NativeLibrary.Function ERROR_CODE = LIBRARY.function("CFErrorGetCode", of(JAVA_LONG, ADDRESS));
+    private static final NativeLibrary.Function ERROR_DESCRIPTION = LIBRARY.function("CFErrorCopyDescription", of(ADDRESS, ADDRESS));
+    private static final long ARRAY_TYPE = typeId("CFArrayGetTypeID");
+    private static final long DICTIONARY_TYPE = typeId("CFDictionaryGetTypeID");
+    private static final long STRING_TYPE = typeId("CFStringGetTypeID");
+    private static final long NUMBER_TYPE = typeId("CFNumberGetTypeID");
+    private static final long DATA_TYPE = typeId("CFDataGetTypeID");
+    private static final long ERROR_TYPE = typeId("CFErrorGetTypeID");
+    static final MemorySegment TRUE = LIBRARY.symbol("kCFBooleanTrue").reinterpret(ADDRESS.byteSize()).get(ADDRESS, 0);
 
-    /**
-     * Returns a human-presentable description for a given error.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorcopydescription(_:)">https://developer.apple.com/documentation/corefoundation/cferrorcopydescription(_:)</a>
-     * @return A localized, human-presentable description of err. This function never returns NULL.
-     */
-    @NotNull
-    CoreFoundation.CFStringRef CFErrorCopyDescription(CFErrorRef err);
+    static long typeId(String function) {
+        return (long) LIBRARY.function(function, of(JAVA_LONG)).invoke();
+    }
 
-    /**
-     * Returns the error code for a given CFError.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferrorgetcode(_:)">https://developer.apple.com/documentation/corefoundation/cferrorgetcode(_:)</a>
-     * @return The error code of err.
-     */
-    CoreFoundation.CFIndex CFErrorGetCode(CFErrorRef err);
+    static MemorySegment requireNonNull(MemorySegment value) {
+        if (value.equals(NULL)) {
+            throw new IllegalStateException("The native framework returned a null object");
+        }
+        return value;
+    }
 
-    /**
-     * Mac OS 9/Carbon errors
-     *
-     * @see <a href="https://developer.apple.com/documentation/foundation/nsosstatuserrordomain">https://developer.apple.com/documentation/foundation/nsosstatuserrordomain</a>
-     */
-    String NSOSStatusErrorDomain = "NSOSStatusErrorDomain";
-
-    /**
-     * Unwrapped version of CFErrorRef without native references
-     */
-    record Error(
-            @NotNull
-            String domain,
-            @NotNull
-            Long code,
-            @NotNull
-            String description
-    ) {
-        @Override
-        public @NotNull String toString() {
-            return "Error{" +
-                   "domain=" + domain +
-                   ", code=" + code +
-                   ", description='" + description + '\'' +
-                   '}';
+    static void requireType(MemorySegment value, long expectedType) {
+        long actualType = (long) GET_TYPE_ID.invoke(requireNonNull(value));
+        if (actualType != expectedType) {
+            throw new ClassCastException("Expected CFTypeID " + expectedType + ", got " + actualType);
         }
     }
 
-    /**
-     * A CFError object encapsulates more rich and extensible error information
-     * than is possible using only an error code or error string.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/cferror">https://developer.apple.com/documentation/corefoundation/cferror</a>
-     */
-    class CFErrorRef extends CoreFoundation.CFTypeRef {
-
-        /**
-         * Placeholder for a reference to a {@code CFErrorRef} object.
-         */
-        public static class ByReference extends PointerByReference {
-            public ByReference() {
-                this(null);
-            }
-
-            public ByReference(CFErrorRef value) {
-                super(value != null ? value.getPointer() : null);
-            }
-
-            @Override
-            public void setValue(Pointer value) {
-                if (value != null) {
-                    CoreFoundation.CFTypeID typeId = CoreFoundation.INSTANCE.CFGetTypeID(value);
-                    if (!ERROR_TYPE_ID.equals(typeId)) {
-                        throw new ClassCastException("Unable to cast to CFErrorRef. Type ID: " + typeId);
-                    }
-                }
-
-                super.setValue(value);
-            }
-
-            public CFErrorRef getErrorRefValue() {
-                Pointer value = super.getValue();
-                if (value == null) {
-                    return null;
-                }
-
-                return new CFErrorRef(value);
-            }
-        }
-
-        public CFErrorRef() {
-            super();
-        }
-
-        public CFErrorRef(Pointer p) {
-            super(p);
-            if (!isTypeID(ERROR_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to CFErrorRef. Type ID: " + getTypeID());
-            }
-        }
-
-        @NotNull
-        public String getDomain() {
-            CoreFoundation.CFStringRef domainRef = INSTANCE.CFErrorGetDomain(this);
-            return domainRef.stringValue();
-        }
-
-        @NotNull
-        public String getDescription() {
-            CoreFoundation.CFStringRef description = INSTANCE.CFErrorCopyDescription(this);
-            try {
-                return description.stringValue();
-            } finally {
-                CoreFoundation.INSTANCE.CFRelease(description);
-            }
-        }
-
-        @NotNull
-        public Long getCode() {
-            CoreFoundation.CFIndex errorCode = INSTANCE.CFErrorGetCode(this);
-            return errorCode.longValue();
-        }
-
-        @NotNull
-        public Error toError() {
-            return new Error(getDomain(), getCode(), getDescription());
+    static void release(MemorySegment value) {
+        if (!value.equals(NULL)) {
+            RELEASE.invoke(value);
         }
     }
 
-    /**
-     * Returns the number of key-value pairs in a dictionary.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/1516741-cfdictionarygetcount">https://developer.apple.com/documentation/corefoundation/1516741-cfdictionarygetcount</a>
-     * @param theDict The dictionary to examine.
-     * @return The number of key-value pairs in theDict.
-     */
-    CoreFoundation.CFIndex CFDictionaryGetCount(CoreFoundation.CFDictionaryRef theDict);
-
-    /**
-     * Creates an immutable dictionary containing the specified key-value pairs.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/1516782-cfdictionarycreate">https://developer.apple.com/documentation/corefoundation/1516782-cfdictionarycreate</a>
-     * @return A new dictionary, or NULL if there was a problem creating the object.
-     * Ownership follows the <a href="https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html">Create Rule</a>.
-     */
-    CoreFoundation.CFDictionaryRef CFDictionaryCreate(
-            CoreFoundation.CFAllocatorRef allocator,
-            CoreFoundation.CFTypeRef[] keys,
-            CoreFoundation.CFTypeRef[] values,
-            CoreFoundation.CFIndex numValues,
-            Pointer keyCallBacks,
-            Pointer valueCallBacks
-    );
-
-    /**
-     * Creates a new immutable array with the given values.
-     * <p>
-     * This reference must be released with {@link CoreFoundation#CFRelease} to avoid leaking
-     * references.
-     * <p>
-     * This is like {@link CoreFoundation#CFArrayCreate(CoreFoundation.CFAllocatorRef, Pointer, CoreFoundation.CFIndex, Pointer)}
-     * but it takes a {@code Pointer[]} instead.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/1388741-cfarraycreate">https://developer.apple.com/documentation/corefoundation/1388741-cfarraycreate</a>
-     *
-     * @param alloc
-     *            The allocator to use to allocate memory for the new array and its
-     *            storage for values. Pass {@code null} or
-     *            {@code kCFAllocatorDefault} to use the current default allocator.
-     * @param values
-     *            A C array of the pointer-sized values to be in the new array. The
-     *            values in the new array are ordered in the same order in which
-     *            they appear in this C array. This value may be {@code null} if
-     *            {@code numValues} is 0. This C array is not changed or freed by
-     *            this function. If {@code values} is not a valid pointer to a C
-     *            array of at least {@code numValues} elements, the behavior is
-     *            undefined.
-     * @param numValues
-     *            The number of values to copy from the {@code values} C array into
-     *            the new array. This number will be the count of the new array—it
-     *            must not be negative or greater than the number of elements in
-     *            values.
-     * @param callBacks
-     *            A pointer to a {@code CFArrayCallBacks} structure initialized with
-     *            the callbacks for the array to use on each value in the
-     *            collection. The retain callback is used within this function, for
-     *            example, to retain all of the new values from the {@code values} C
-     *            array. A copy of the contents of the callbacks structure is made
-     *            so that a pointer to a structure on the stack can be passed in or
-     *            can be reused for multiple collection creations.
-     *            <p>
-     *            This value may be {@code null}, which is treated as if a valid
-     *            structure of version 0 with all fields {@code null} had been
-     *            passed in.
-     * @return A new immutable array containing {@code numValues} from
-     *         {@code values}, or {@code null} if there was a problem creating the
-     *         object.
-     */
-    CoreFoundation.CFArrayRef CFArrayCreate(CoreFoundation.CFAllocatorRef alloc, CoreFoundation.CFTypeRef[] values, CoreFoundation.CFIndex numValues, Pointer callBacks);
-
-    /**
-     * Determines whether two Core Foundation objects are considered equal.
-     *
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/1521287-cfequal">https://developer.apple.com/documentation/corefoundation/1521287-cfequal</a>
-     * @param cf1 A CFType object to compare to cf2.
-     * @param cf2 A CFType object to compare to cf1.
-     * @return true if cf1 and cf2 are of the same type and considered equal, otherwise false.
-     */
-    boolean CFEqual(CoreFoundation.CFTypeRef cf1, CoreFoundation.CFTypeRef cf2);
-
-    /**
-     * Boolean false value.
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/kcfbooleanfalse">https://developer.apple.com/documentation/corefoundation/kcfbooleanfalse</a>
-     */
-    CoreFoundation.CFBooleanRef kCFBooleanFalse = resolveBoolean("kCFBooleanFalse", false);
-
-    /**
-     * Boolean true value.
-     * @see <a href="https://developer.apple.com/documentation/corefoundation/kcfbooleantrue">https://developer.apple.com/documentation/corefoundation/kcfbooleantrue</a>
-     */
-    CoreFoundation.CFBooleanRef kCFBooleanTrue = resolveBoolean("kCFBooleanTrue", true);
-
-    private static CoreFoundation.CFBooleanRef resolveBoolean(String name, boolean expectedValue) {
-        Pointer pointer = NativeLibrary.getInstance(CoreFoundationExtUtil.CORE_FOUNDATION_LIBRARY_NAME).getGlobalVariableAddress(name);
-        CoreFoundation.CFBooleanRef cfBoolean = new CoreFoundation.CFBooleanRef(pointer.getPointer(0));
-        if (cfBoolean.booleanValue() != expectedValue) {
-            throw new IllegalStateException("Expected " + name + " to be " + expectedValue + ", but got " + cfBoolean.booleanValue());
-        }
-        return cfBoolean;
+    static boolean equal(MemorySegment first, MemorySegment second) {
+        return (byte) EQUAL.invoke(requireNonNull(first), requireNonNull(second)) != 0;
     }
 
-    class CFArrayRefByReference extends PointerByReference {
-        public CFArrayRefByReference() {
-        }
-
-        public CFArrayRefByReference(CoreFoundation.CFArrayRef value) {
-            super(value.getPointer());
-        }
-
-        @Nullable
-        public CoreFoundation.CFArrayRef getArray() {
-            Pointer value = super.getValue();
-            if (value == null) {
-                return null;
+    static MemorySegment createArray(MemorySegment... values) {
+        try (var arena = Arena.ofConfined()) {
+            var pointers = arena.allocate(ADDRESS, values.length);
+            for (int index = 0; index < values.length; index++) {
+                pointers.setAtIndex(ADDRESS, index, values[index]);
             }
-
-            return new CoreFoundation.CFArrayRef(value);
+            return requireNonNull((MemorySegment) ARRAY_CREATE.invoke(NULL, pointers, (long) values.length,
+                    LIBRARY.symbol("kCFTypeArrayCallBacks")));
         }
     }
 
-    class CFStringRefByReference extends PointerByReference {
-        public CFStringRefByReference() {
-        }
+    static long arrayCount(MemorySegment array) {
+        requireType(array, ARRAY_TYPE);
+        return (long) ARRAY_COUNT.invoke(array);
+    }
 
-        public CFStringRefByReference(CoreFoundation.CFStringRef value) {
-            super(value.getPointer());
+    static MemorySegment arrayValue(MemorySegment array, long index) {
+        long count = arrayCount(array);
+        if (index < 0 || index >= count) {
+            throw new IndexOutOfBoundsException("Array index " + index + ", count " + count);
         }
+        return (MemorySegment) ARRAY_VALUE.invoke(array, index);
+    }
 
-        @Nullable
-        public CoreFoundation.CFStringRef getStringRef() {
-            Pointer value = super.getValue();
-            if (value == null) {
-                return null;
+    static MemorySegment createDictionary(Map<MemorySegment, MemorySegment> values) {
+        try (var arena = Arena.ofConfined()) {
+            var keys = arena.allocate(ADDRESS, values.size());
+            var pointers = arena.allocate(ADDRESS, values.size());
+            int index = 0;
+            for (var entry : values.entrySet()) {
+                keys.setAtIndex(ADDRESS, index, entry.getKey());
+                pointers.setAtIndex(ADDRESS, index, entry.getValue());
+                index++;
             }
-
-            return new CoreFoundation.CFStringRef(value);
+            return requireNonNull((MemorySegment) DICTIONARY_CREATE.invoke(NULL, keys, pointers, (long) values.size(),
+                    LIBRARY.symbol("kCFTypeDictionaryKeyCallBacks"), LIBRARY.symbol("kCFTypeDictionaryValueCallBacks")));
         }
+    }
+
+    static long dictionaryCount(MemorySegment dictionary) {
+        requireType(dictionary, DICTIONARY_TYPE);
+        return (long) DICTIONARY_COUNT.invoke(dictionary);
+    }
+
+    static MemorySegment dictionaryValue(MemorySegment dictionary, MemorySegment key) {
+        requireType(dictionary, DICTIONARY_TYPE);
+        return (MemorySegment) DICTIONARY_VALUE.invoke(dictionary, key);
+    }
+
+    static MemorySegment createString(String value) {
+        try (var arena = Arena.ofConfined()) {
+            var bytes = value.getBytes(StandardCharsets.UTF_8);
+            return requireNonNull((MemorySegment) STRING_CREATE.invoke(NULL, arena.allocateFrom(JAVA_BYTE, bytes),
+                    (long) bytes.length, UTF8, (byte) 0));
+        }
+    }
+
+    static String stringValue(MemorySegment string) {
+        requireType(string, STRING_TYPE);
+        long length = (long) STRING_LENGTH.invoke(string);
+        long capacity = Math.addExact((long) STRING_MAXIMUM_SIZE.invoke(length, UTF8), 1);
+        try (var arena = Arena.ofConfined()) {
+            var buffer = arena.allocate(capacity);
+            if ((byte) STRING_GET_C_STRING.invoke(string, buffer, capacity, UTF8) == 0) {
+                throw new IllegalStateException("CFStringGetCString failed");
+            }
+            return buffer.getString(0, StandardCharsets.UTF_8);
+        }
+    }
+
+    static long numberValue(MemorySegment number) {
+        requireType(number, NUMBER_TYPE);
+        try (var arena = Arena.ofConfined()) {
+            var value = arena.allocate(JAVA_LONG);
+            if ((byte) NUMBER_VALUE.invoke(number, 4, value) == 0) {
+                throw new IllegalStateException("CFNumberGetValue failed");
+            }
+            return value.get(JAVA_LONG, 0);
+        }
+    }
+
+    static byte[] dataBytes(MemorySegment data) {
+        requireType(data, DATA_TYPE);
+        long length = (long) DATA_LENGTH.invoke(data);
+        if (length == 0) {
+            return new byte[0];
+        }
+        var bytes = requireNonNull((MemorySegment) DATA_BYTES.invoke(data));
+        try (var arena = Arena.ofConfined()) {
+            return bytes.reinterpret(length, arena, null).toArray(JAVA_BYTE);
+        }
+    }
+
+    static String description(MemorySegment value) {
+        var description = requireNonNull((MemorySegment) COPY_DESCRIPTION.invoke(requireNonNull(value)));
+        try {
+            return stringValue(description);
+        } finally {
+            release(description);
+        }
+    }
+
+    static Error error(MemorySegment error) {
+        requireType(error, ERROR_TYPE);
+        var description = requireNonNull((MemorySegment) ERROR_DESCRIPTION.invoke(error));
+        try {
+            return new Error(stringValue((MemorySegment) ERROR_DOMAIN.invoke(error)),
+                    (long) ERROR_CODE.invoke(error), stringValue(description));
+        } finally {
+            release(description);
+        }
+    }
+
+    record Error(String domain, long code, String description) {
+    }
+
+    private CoreFoundationExt() {
     }
 }
