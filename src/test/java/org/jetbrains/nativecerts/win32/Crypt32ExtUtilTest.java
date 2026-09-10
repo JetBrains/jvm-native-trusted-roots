@@ -39,6 +39,11 @@ public class Crypt32ExtUtilTest {
         var exception = assertThrows(WindowsCertificateException.class,
                 () -> Crypt32ExtUtil.validateCertificate(getTestCertificate().getEncoded()));
         assertEquals(Crypt32Ext.CERT_E_UNTRUSTEDROOT, exception.getErrorCode());
+        // the message must carry the FormatMessageW text for the code, as JNA's Win32Exception did
+        String message = exception.getMessage();
+        assertTrue(message, message.contains("0x800b0109"));
+        assertFalse(message, message.contains("unable to format message"));
+        assertFalse(message, message.contains("no system message"));
     }
 
     @Test

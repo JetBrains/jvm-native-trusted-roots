@@ -83,7 +83,8 @@ final class Kernel32Ext {
             if (length <= 0) {
                 return null;
             }
-            String message = buffer.asSlice(0, (long) length * JAVA_CHAR.byteSize()).getString(0, StandardCharsets.UTF_16LE);
+            // read the NUL-terminated string; `length` excludes the terminator, so do not slice the buffer to it
+            String message = buffer.getString(0, StandardCharsets.UTF_16LE);
             return message.strip();
         }
     }
