@@ -1,525 +1,70 @@
 package org.jetbrains.nativecerts.mac;
 
-import com.sun.jna.*;
-import com.sun.jna.platform.mac.CoreFoundation;
-import com.sun.jna.ptr.PointerByReference;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFArrayRefByReference;
-import org.jetbrains.nativecerts.mac.CoreFoundationExt.CFStringRefByReference;
+import org.jetbrains.nativecerts.NativeLibrary;
 
-import static com.sun.jna.platform.mac.CoreFoundation.CFStringRef.createCFString;
+import java.lang.foreign.MemorySegment;
 
-@SuppressWarnings("unused")
-public interface SecurityFramework extends Library {
+import static java.lang.foreign.FunctionDescriptor.of;
+import static java.lang.foreign.MemorySegment.NULL;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
+import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 
-    SecurityFramework INSTANCE = Native.load(SecurityFrameworkUtil.SECURITY_FRAMEWORK_LIBRARY_NAME, SecurityFramework.class);
+final class SecurityFramework {
+    static final int SUCCESS = 0;
+    static final int ITEM_NOT_FOUND = -25300;
+    static final int USER = 0;
+    static final int ADMIN = 1;
+    static final long TRUST_ROOT = 1;
+    private static final NativeLibrary LIBRARY = new NativeLibrary("/System/Library/Frameworks/Security.framework/Security");
+    static final NativeLibrary.Function ITEM_COPY_MATCHING = LIBRARY.function("SecItemCopyMatching", of(JAVA_INT, ADDRESS, ADDRESS));
+    static final NativeLibrary.Function KEYCHAIN_OPEN = LIBRARY.function("SecKeychainOpen", of(JAVA_INT, ADDRESS, ADDRESS));
+    static final NativeLibrary.Function CERTIFICATE_COPY_DATA = LIBRARY.function("SecCertificateCopyData", of(ADDRESS, ADDRESS));
+    static final NativeLibrary.Function POLICY_CREATE_SSL = LIBRARY.function("SecPolicyCreateSSL", of(ADDRESS, JAVA_BYTE, ADDRESS));
+    static final NativeLibrary.Function POLICY_COPY_PROPERTIES = LIBRARY.function("SecPolicyCopyProperties", of(ADDRESS, ADDRESS));
+    static final NativeLibrary.Function TRUST_CREATE = LIBRARY.function("SecTrustCreateWithCertificates",
+            of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
+    static final NativeLibrary.Function TRUST_EVALUATE = LIBRARY.function("SecTrustEvaluateWithError", of(JAVA_BYTE, ADDRESS, ADDRESS));
+    static final NativeLibrary.Function COPY_TRUST_SETTINGS = LIBRARY.function("SecTrustSettingsCopyTrustSettings",
+            of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS));
+    private static final NativeLibrary.Function ERROR_MESSAGE = LIBRARY.function("SecCopyErrorMessageString", of(ADDRESS, JAVA_INT, ADDRESS));
+    static final long CERTIFICATE_TYPE = (long) LIBRARY.function("SecCertificateGetTypeID", of(JAVA_LONG)).invoke();
+    static final long POLICY_TYPE = (long) LIBRARY.function("SecPolicyGetTypeID", of(JAVA_LONG)).invoke();
 
-    /**
-     * A dictionary key whose value is the item’s class.
-     * @see <a href="https://developer.apple.com/documentation/security/ksecclass">https://developer.apple.com/documentation/security/ksecclass</a>
-     */
-    CoreFoundation.CFStringRef kSecClass = resolveStringConstant("kSecClass");
+    static final MemorySegment CLASS = constant("kSecClass");
+    static final MemorySegment CLASS_CERTIFICATE = constant("kSecClassCertificate");
+    static final MemorySegment MATCH_LIMIT = constant("kSecMatchLimit");
+    static final MemorySegment MATCH_LIMIT_ALL = constant("kSecMatchLimitAll");
+    static final MemorySegment MATCH_SEARCH_LIST = constant("kSecMatchSearchList");
+    static final MemorySegment RETURN_REF = constant("kSecReturnRef");
+    static final MemorySegment POLICY_APPLE_SSL = constant("kSecPolicyAppleSSL");
+    static final MemorySegment POLICY_OID = constant("kSecPolicyOid");
+    static final MemorySegment TRUST_SETTINGS_RESULT = CoreFoundationExt.createString("kSecTrustSettingsResult");
+    static final MemorySegment TRUST_SETTINGS_ALLOWED_ERROR = CoreFoundationExt.createString("kSecTrustSettingsAllowedError");
+    static final MemorySegment TRUST_SETTINGS_POLICY_NAME = CoreFoundationExt.createString("kSecTrustSettingsPolicyName");
+    static final MemorySegment TRUST_SETTINGS_POLICY = CoreFoundationExt.createString("kSecTrustSettingsPolicy");
 
-    /**
-     * A key whose value indicates the match limit.
-     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimit">https://developer.apple.com/documentation/security/kSecMatchLimit</a>
-     */
-    CoreFoundation.CFStringRef kSecMatchLimit = resolveStringConstant("kSecMatchLimit");
+    private static MemorySegment constant(String name) {
+        return CoreFoundationExt.requireNonNull(LIBRARY.symbol(name).reinterpret(ADDRESS.byteSize()).get(ADDRESS, 0));
+    }
 
-    /**
-     * A key whose value indicates a list of items to search.
-     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchSearchList">https://developer.apple.com/documentation/security/kSecMatchSearchList</a>
-     */
-    CoreFoundation.CFStringRef kSecMatchSearchList = resolveStringConstant("kSecMatchSearchList");
-
-    /**
-     * A value that corresponds to matching an unlimited number of items.
-     * @see <a href="https://developer.apple.com/documentation/security/kSecMatchLimitAll">https://developer.apple.com/documentation/security/kSecMatchLimitAll</a>
-     */
-    CoreFoundation.CFStringRef kSecMatchLimitAll = resolveStringConstant("kSecMatchLimitAll");
-
-    /**
-     * A key whose value is a Boolean indicating whether or not to return a reference to an item.
-     * @see <a href="https://developer.apple.com/documentation/security/kSecReturnRef">https://developer.apple.com/documentation/security/kSecReturnRef</a>
-     */
-    CoreFoundation.CFStringRef kSecReturnRef = resolveStringConstant("kSecReturnRef");
-
-    /**
-     * The value that indicates a certificate item.
-     * @see <a href="https://developer.apple.com/documentation/security/kSecClassCertificate">https://developer.apple.com/documentation/security/kSecClassCertificate</a>
-     */
-    CoreFoundation.CFStringRef kSecClassCertificate = resolveStringConstant("kSecClassCertificate");
-
-    /**
-     * Returns a string explaining the meaning of a security result code.
-     *
-     * @param status
-     *          A result code of type OSStatus returned by a security function.
-     *          See <a href="https://developer.apple.com/documentation/security/1542001-security_framework_result_codes">Security Framework Result Codes</a> for a list of codes.
-     * @param reserved
-     *          Reserved for future use. Pass NULL for this parameter.
-     * @return
-     *          A human-readable string describing the result, or NULL if no string is available for the specified result code.
-     *          Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object when you are finished using it.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/seccopyerrormessagestring(_:_:)">https://developer.apple.com/documentation/security/seccopyerrormessagestring(_:_:)</a>
-     */
-    @Nullable
-    CoreFoundation.CFStringRef SecCopyErrorMessageString(@NotNull OSStatus status, @Nullable Pointer reserved);
-
-    /**
-     * Obtains an array of all certificates that have trust settings in a specific trust settings domain.
-     *
-     * @param domain
-     *          The trust settings domain for which you want a list of certificates.
-     *          For possible values, see {@link SecTrustSettingsDomain}.
-     * @param certArray
-     *          On return, an array of {@link SecCertificateRef} objects representing the certificates that have
-     *          trust settings in the specified domain. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)}
-     *          function to release this object when you are finished with it.
-     * @return
-     *          A result code. See <a href="https://developer.apple.com/documentation/security/1542001-security_framework_result_codes">Security Framework Result Codes</a>.
-     *          Returns {@link OSStatus#errSecNoTrustSettings} if no trust settings exist for the specified domain.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1397413-sectrustsettingscopycertificates">developer.apple.com</a>
-     */
-    @NotNull
-    OSStatus SecTrustSettingsCopyCertificates(@NotNull SecTrustSettingsDomain domain, @NotNull CFArrayRefByReference certArray);
-
-    /**
-     * Returns one or more keychain items that match a search query, or copies attributes of specific keychain items.
-     * @see <a href="https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)">https://developer.apple.com/documentation/security/secitemcopymatching(_:_:)</a>
-     */
-    @NotNull
-    OSStatus SecItemCopyMatching(@NotNull CoreFoundation.CFDictionaryRef query, CFArrayRefByReference result);
-
-    /**
-     * Opens a keychain.
-     * @see <a href="https://developer.apple.com/documentation/security/seckeychainopen(_:_:)">https://developer.apple.com/documentation/security/seckeychainopen(_:_:)</a>
-     * @param pathName A constant character string representing the POSIX path to the keychain to open.
-     * @param keychain On return, a pointer to the keychain object.
-     *                 You must call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object when you are finished using it.
-     * @return A result code. See {@link OSStatus}
-     */
-    OSStatus SecKeychainOpen(String pathName, SecKeychainRefByReference keychain);
-
-    /**
-     * Retrieves the common name of the subject of a certificate.
-     *
-     * @param certificate
-     *          The certificate object from which to retrieve the common name.
-     * @param commonName
-     *          On return, points to the common name. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object when you are finished with it.
-     * @return
-     *          A result code. See {@link OSStatus}
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1394814-seccertificatecopycommonname">developer.apple.com</a>
-     */
-    @NotNull
-    OSStatus SecCertificateCopyCommonName(@NotNull SecCertificateRef certificate, @NotNull CFStringRefByReference commonName);
-
-    CoreFoundation.CFTypeID SecCertificateGetTypeID();
-    CoreFoundation.CFTypeID SecPolicyGetTypeID();
-    CoreFoundation.CFTypeID SecKeychainGetTypeID();
-    CoreFoundation.CFTypeID SecTrustGetTypeID();
-
-    CoreFoundation.CFTypeID SEC_CERTIFICATE_TYPE_ID = INSTANCE.SecCertificateGetTypeID();
-    CoreFoundation.CFTypeID SEC_KEYCHAIN_REF_TYPE_ID = INSTANCE.SecKeychainGetTypeID();
-    CoreFoundation.CFTypeID SEC_POLICY_TYPE_ID = INSTANCE.SecPolicyGetTypeID();
-    CoreFoundation.CFTypeID SEC_TRUST_TYPE_ID = INSTANCE.SecTrustGetTypeID();
-
-    /**
-     * An abstract Core Foundation-type object representing an X.509 certificate.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/seccertificateref">developer.apple.com</a>
-     */
-    class SecCertificateRef extends CoreFoundation.CFTypeRef {
-        public SecCertificateRef() {
-        }
-
-        public SecCertificateRef(Pointer p) {
-            super(p);
-            if (!isTypeID(SEC_CERTIFICATE_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to SecCertificateRef. Type ID: " + getTypeID());
-            }
+    static CoreFoundationExt.Error error(int status) {
+        var message = (MemorySegment) ERROR_MESSAGE.invoke(status, NULL);
+        try {
+            return new CoreFoundationExt.Error("NSOSStatusErrorDomain", status,
+                    message.equals(NULL) ? "OSStatus: " + status : CoreFoundationExt.stringValue(message));
+        } finally {
+            CoreFoundationExt.release(message);
         }
     }
 
-    /**
-     * An opaque type that represents a keychain.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/SecKeychainRef">developer.apple.com</a>
-     */
-    class SecKeychainRef extends CoreFoundation.CFTypeRef {
-        public SecKeychainRef() {
-        }
-
-        public SecKeychainRef(Pointer p) {
-            super(p);
-            if (!isTypeID(SEC_KEYCHAIN_REF_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to SecKeychainRef. Type ID: " + getTypeID());
-            }
+    static void checkStatus(String operation, int status) {
+        if (status != SUCCESS) {
+            throw new IllegalStateException(operation + " failed: " + error(status));
         }
     }
 
-    class SecKeychainRefByReference extends PointerByReference {
-        public SecKeychainRefByReference() {
-        }
-
-        public SecKeychainRefByReference(SecKeychainRef value) {
-            super(value.getPointer());
-        }
-
-        @Nullable
-        public SecKeychainRef getSecKeychainRef() {
-            Pointer value = super.getValue();
-            if (value == null) {
-                return null;
-            }
-
-            return new SecKeychainRef(value);
-        }
-    }
-
-    /**
-     * An object that represents a trust policy.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/secpolicyref">developer.apple.com</a>
-     */
-    class SecPolicyRef extends CoreFoundation.CFTypeRef {
-        public SecPolicyRef() {
-        }
-
-        public SecPolicyRef(Pointer p) {
-            super(p);
-            if (!isTypeID(SEC_POLICY_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to SecPolicyRef. Type ID: " + getTypeID());
-            }
-        }
-    }
-
-    /**
-     * An object used to evaluate trust.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/sectrust">developer.apple.com</a>
-     */
-    class SecTrustRef extends CoreFoundation.CFTypeRef {
-        public SecTrustRef() {
-        }
-
-        public SecTrustRef(Pointer p) {
-            super(p);
-            if (!isTypeID(SEC_TRUST_TYPE_ID)) {
-                throw new ClassCastException("Unable to cast to SecTrustRef. Type ID: " + getTypeID());
-            }
-        }
-    }
-
-    class SecTrustRefByReference extends PointerByReference {
-        public SecTrustRefByReference() {
-        }
-
-        public SecTrustRefByReference(SecTrustRef value) {
-            super(value.getPointer());
-        }
-
-        @Nullable
-        public SecTrustRef getSecTrustRef() {
-            Pointer value = super.getValue();
-            if (value == null) {
-                return null;
-            }
-
-            return new SecTrustRef(value);
-        }
-    }
-
-    /**
-     * Returns a policy object for evaluating SSL certificate chains.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)">https://developer.apple.com/documentation/security/secpolicycreatessl(_:_:)</a>
-     *
-     * @param server Specify true on the client side to return a policy for SSL server certificates.
-     * @param hostname If you specify a value for this parameter, the policy will require the specified value to match the host name in the leaf certificate.
-     * @return The policy object. In Objective-C, call the CFRelease function to release the object when you are finished with it.
-     */
-    SecPolicyRef SecPolicyCreateSSL(boolean server, CoreFoundation.CFStringRef hostname);
-
-    /**
-     * Returns a dictionary containing a policy’s properties.
-     *
-     * @param policyRef The policy from which properties should be copied.
-     * @return A dictionary with the policy's properties.
-     * See <a href="https://developer.apple.com/documentation/security/certificate_key_and_trust_services/policies/security_policy_keys">Security Policy Keys</a>
-     * for a list of valid keys. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to free the dictionary's memory when you are done with it.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1401915-secpolicycopyproperties">developer.apple.com</a>
-     */
-    CoreFoundation.CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef policyRef);
-
-    /**
-     * Returns a DER representation of a certificate given a certificate object.
-     *
-     * @param certificate
-     *          The certificate object for which you wish to return the DER (Distinguished Encoding Rules)
-     *          representation of the X.509 certificate.
-     * @return
-     *          The DER representation of the certificate.
-     *          Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function to release this object
-     *          when you are finished with it. Returns NULL if the data passed in the certificate parameter is
-     *          not a valid certificate object.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1396080-seccertificatecopydata">developer.apple.com</a>
-     */
-    CoreFoundation.CFDataRef SecCertificateCopyData(SecCertificateRef certificate);
-
-    /**
-     * Basic X509 plus host name verification per RFC 2818.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyapplessl">developer.apple.com</a>
-     */
-    CoreFoundation.CFStringRef kSecPolicyAppleSSL = resolveStringConstant("kSecPolicyAppleSSL");
-
-    /**
-     * The object identifier that defines the policy type (CFStringRef). All policies have a value for this key.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/ksecpolicyoid">developer.apple.com</a>
-     */
-    CoreFoundation.CFStringRef kSecPolicyOid = resolveStringConstant("kSecPolicyOid");
-
-    /**
-     * A number indicating the effective trust setting for this usage constraints dictionary.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsresult">developer.apple.com</a>
-     */
-    CoreFoundation.CFStringRef kSecTrustSettingsResult = createCFString("kSecTrustSettingsResult");
-
-    /**
-     * A number which, if encountered during certificate verification, is ignored for that certificate.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingsallowederror">developer.apple.com</a>
-     */
-    CoreFoundation.CFStringRef kSecTrustSettingsAllowedError = createCFString("kSecTrustSettingsAllowedError");
-
-    /**
-     * Specifies a cert verification policy, e.g., sslServer, eapClient, etc. using policy names.
-     * This entry can be used to restrict the policy where
-     * the same Policy Constant is used for multiple policyNames
-     */
-    CoreFoundation.CFStringRef kSecTrustSettingsPolicyName = createCFString("kSecTrustSettingsPolicyName");
-
-    /**
-     * A policy object specifying the certificate verification policy.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/ksectrustsettingspolicy">developer.apple.com</a>
-     */
-    CoreFoundation.CFStringRef kSecTrustSettingsPolicy = createCFString("kSecTrustSettingsPolicy");
-
-    /**
-     * Obtains the trust settings for a certificate.
-     *
-     * @param certRef
-     *          The certificate for which you want the trust settings.
-     *          Pass the value <a href="https://developer.apple.com/documentation/security/ksectrustsettingsdefaultrootcertsetting">kSecTrustSettingsDefaultRootCertSetting</a>
-     *          to obtain the default root certificate trust settings for the domain.
-     * @param domain
-     *          The trust settings domain of the trust settings that you wish to obtain.
-     *          For possible values, see {@link SecTrustSettingsDomain}.
-     * @param trustSettings
-     *          On return, an array of {@link com.sun.jna.platform.mac.CoreFoundation.CFDictionaryRef} objects
-     *          specifying the trust settings for the certificate. For the contents of the dictionaries,
-     *          see the discussion below. Call the {@link CoreFoundation#CFRelease(CoreFoundation.CFTypeRef)} function
-     *          to release this object when you are finished with it.
-     * @return
-     *          A result code. See {@link OSStatus}. Returns {@link OSStatus#errSecItemNotFound} if no trust settings
-     *          exist for the specified certificate and domain.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1400261-sectrustsettingscopytrustsetting">developer.apple.com</a>
-     */
-    OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain, CFArrayRefByReference trustSettings);
-
-    /**
-     * Creates a trust management object based on certificates and policies.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)">https://developer.apple.com/documentation/security/sectrustcreatewithcertificates(_:_:_:)</a>
-     *
-     * @param certificates The certificate to be verified, plus any other certificates you think might be useful for verifying the certificate. The certificate to be verified must be the first in the array. If you want to specify only one certificate, you can pass a SecCertificateRef object; otherwise, pass an array of SecCertificateRef objects.
-     * @param policies References to one or more policies to be evaluated. You can pass a single SecPolicyRef object, or an array of one or more SecPolicyRef objects. If you pass in multiple policies, all policies must verify for the certificate chain to be considered valid. You typically use one of the standard policies, like the one returned by SecPolicyCreateBasicX509.
-     * @param trust On return, points to the newly created trust management object. In Objective-C, call the CFRelease function to release this object when you are finished with it.
-     * @return A result code. See <a href="https://developer.apple.com/documentation/security/security-framework-result-codes">Security Framework Result Codes</a>.
-     */
-    OSStatus SecTrustCreateWithCertificates(CoreFoundation.CFArrayRef certificates, SecPolicyRef policies, SecTrustRefByReference trust);
-
-    /**
-     * Evaluates trust for the specified certificate and policies.
-     * @param trust The trust management object to evaluate. A trust management object includes the certificate to be verified plus the policy or policies to be used in evaluating trust. It can optionally also include other certificates to be used in verifying the first certificate. Use the SecTrustCreateWithCertificates function to create a trust management object.
-     * @param error An error pointer the method uses to return an error when trust evaluation fails. Set to nil to ignore the error.
-     * @return true if the certificate is trusted; otherwise, false.
-     */
-    boolean SecTrustEvaluateWithError(SecTrustRef trust, CoreFoundationExt.CFErrorRef.ByReference error);
-
-    /**
-     * Retrieves the keychain search list for a specified preference domain.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:">https://developer.apple.com/documentation/security/seckeychaincopydomainsearchlist(_:_:</a>
-     *
-     * @param domain The preference domain from which you wish to retrieve the keychain search list. See {@link SecTrustSettingsDomain} for possible domain values.
-     * @param searchList On return, a pointer to the keychain search list of the specified preference domain.
-     * @return A result code. See {@link OSStatus}
-     */
-    OSStatus SecKeychainCopyDomainSearchList(SecTrustSettingsDomain domain, CFArrayRefByReference searchList);
-
-    /**
-     * Trust settings returned in usage constraints dictionaries.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/sectrustsettingsresult">developer.apple.com</a>
-     */
-    class SecTrustSettingsResult extends NativeLong {
-        /**
-         * Never valid in a Trust Settings array or in an API call.
-         */
-        public static final SecTrustSettingsResult kSecTrustSettingsResultInvalid = new SecTrustSettingsResult(0);
-
-        /**
-         * Root cert is explicitly trusted
-         */
-        public static final SecTrustSettingsResult kSecTrustSettingsResultTrustRoot = new SecTrustSettingsResult(1);
-
-        /**
-         * Non-root cert is explicitly trusted
-         */
-        public static final SecTrustSettingsResult kSecTrustSettingsResultTrustAsRoot = new SecTrustSettingsResult(2);
-
-        /**
-         * Cert is explicitly distrusted
-         */
-        public static final SecTrustSettingsResult kSecTrustSettingsResultDeny = new SecTrustSettingsResult(3);
-
-        /**
-         * Neither trusted nor distrusted; evaluation proceeds as usual
-         */
-        public static final SecTrustSettingsResult kSecTrustSettingsResultUnspecified = new SecTrustSettingsResult(4);
-
-        public SecTrustSettingsResult() {
-        }
-
-        public SecTrustSettingsResult(long value) {
-            super(value);
-        }
-    }
-
-    /**
-     * Result codes common to many Security framework functions.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/1542001-security_framework_result_codes">developer.apple.com</a>
-     */
-    class OSStatus extends NativeLong {
-        public static final OSStatus errSecSuccess = new OSStatus(0);
-
-        /**
-         * The specified item could not be found in the keychain.
-         *
-         * @see <a href="https://developer.apple.com/documentation/security/1542001-security_framework_result_codes/errsecitemnotfound">https://developer.apple.com/documentation/security/1542001-security_framework_result_codes/errsecitemnotfound</a>
-         */
-        public static final OSStatus errSecItemNotFound = new OSStatus(-25300);
-
-        /**
-         * No Trust Settings were found.
-         * @see <a href="https://developer.apple.com/documentation/security/errsecnotrustsettings">https://developer.apple.com/documentation/security/errsecnotrustsettings</a>
-         */
-        public static final OSStatus errSecNoTrustSettings = new OSStatus(-25263);
-
-        public OSStatus() {
-        }
-
-        public OSStatus(long value) {
-            super(value);
-        }
-
-        @NotNull
-        public String getErrorMessageString() {
-            CoreFoundation.CFStringRef string = INSTANCE.SecCopyErrorMessageString(this, Pointer.NULL);
-            if (string == null) {
-                return "OSStatus:" + longValue();
-            }
-            try {
-                return string.stringValue();
-            }
-            finally {
-                string.release();
-            }
-        }
-
-        @Override
-        public boolean equals(Object rhs) {
-            if (!(rhs instanceof OSStatus)) {
-                return false;
-            }
-
-            return intValue() == ((OSStatus)rhs).intValue();
-        }
-
-        @Override
-        public int hashCode() {
-            return intValue();
-        }
-
-        @Override
-        public String toString() {
-            return getErrorMessageString();
-        }
-
-        public CoreFoundationExt.Error toError() {
-            return new CoreFoundationExt.Error(
-                    CoreFoundationExt.NSOSStatusErrorDomain,
-                    longValue(),
-                    getErrorMessageString()
-            );
-        }
-    }
-
-    /**
-     * The trust settings domains.
-     *
-     * @see <a href="https://developer.apple.com/documentation/security/sectrustsettingsdomain">developer.apple.com</a>
-     */
-    class SecTrustSettingsDomain extends NativeLong {
-        /**
-         * Per-user trust settings.
-         *
-         * @see <a href="https://developer.apple.com/documentation/security/sectrustsettingsdomain/user">developer.apple.com</a>
-         */
-        public static final SecTrustSettingsDomain user = new SecTrustSettingsDomain(0);
-
-        /**
-         * Locally administered, system-wide trust settings.
-         * <p>
-         * Administrator privileges are required to make changes to this domain.
-         *
-         * @see <a href="https://developer.apple.com/documentation/security/sectrustsettingsdomain/admin">developer.apple.com</a>
-         */
-        public static final SecTrustSettingsDomain admin = new SecTrustSettingsDomain(1);
-
-        /**
-         * System trust settings.
-         * <p>
-         * These trust settings are immutable and comprise the set of trusted root certificates supplied in macOS. These settings are read-only, even by root.
-         *
-         * @see <a href="https://developer.apple.com/documentation/security/sectrustsettingsdomain/system">developer.apple.com</a>
-         */
-        public static final SecTrustSettingsDomain system = new SecTrustSettingsDomain(2);
-
-        public SecTrustSettingsDomain() {
-        }
-
-        public SecTrustSettingsDomain(long value) {
-            super(value);
-        }
-    }
-
-    private static CoreFoundation.CFStringRef resolveStringConstant(String name) {
-        Pointer pointer = NativeLibrary.getInstance(SecurityFrameworkUtil.SECURITY_FRAMEWORK_LIBRARY_NAME).getGlobalVariableAddress(name);
-        return new CoreFoundation.CFStringRef(pointer.getPointer(0));
+    private SecurityFramework() {
     }
 }

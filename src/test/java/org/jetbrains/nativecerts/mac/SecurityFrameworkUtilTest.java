@@ -10,10 +10,14 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.hasItem;
@@ -43,7 +47,7 @@ public class SecurityFrameworkUtilTest {
     }
 
     @Test
-    public void enumerateSystemCertificates() {
+    public void enumerateSystemCertificates() throws Exception {
         List<X509Certificate> trustedRoots = SecurityFrameworkUtil.getSystemTrustedRoots();
 
         System.out.println(trustedRoots.size());
@@ -53,16 +57,11 @@ public class SecurityFrameworkUtilTest {
 
         Assert.assertTrue("Expected >100 system roots", trustedRoots.size() > 100);
 
-        Assert.assertTrue(
-                "Expected some roots from 'Google Trust Services LLC'",
-                trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectX500Principal().toString().contains("Google Trust Services LLC"))
-        );
-        Assert.assertTrue(
-                "Expected some roots from 'VeriSign'",
-                trustedRoots.stream().anyMatch(crt ->
-                        crt.getSubjectX500Principal().toString().contains("VeriSign"))
-        );
+        var pem = executeProcessGetStdout(ExitCodeHandling.ASSERT, "/usr/bin/security", "find-certificate", "-a", "-p",
+                "/System/Library/Keychains/SystemRootCertificates.keychain");
+        var expected = CertificateFactory.getInstance("X.509").generateCertificates(
+                new ByteArrayInputStream(pem.getBytes(StandardCharsets.US_ASCII)));
+        assertEquals(new HashSet<>(expected), new HashSet<>(trustedRoots));
     }
 
     @Test
