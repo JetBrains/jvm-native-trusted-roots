@@ -15,9 +15,14 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static org.jetbrains.nativecerts.NativeTrustedRootsInternalUtils.isMac;
-import static org.jetbrains.nativecerts.mac.CoreFoundationExt.*;
+import static org.jetbrains.nativecerts.mac.CoreFoundationExt.kCFBooleanTrue;
+import static org.jetbrains.nativecerts.mac.CoreFoundationExt.kCFNumberSInt64Type;
+import static org.jetbrains.nativecerts.mac.CoreFoundationExtUtil.*;
 import static org.junit.Assert.*;
 
+/**
+ * Round-trip tests of the Core Foundation conversions in {@link CoreFoundationExtUtil}.
+ */
 public class CoreFoundationExtTest {
     @BeforeClass
     public static void requireMacOS() {
@@ -26,11 +31,11 @@ public class CoreFoundationExtTest {
 
     @Test
     public void stringsRoundTripAsUtf8() {
-        for (var text : new String[]{"", "Trusted roots", "Grüße 世界 🔐"}) {
-            var string = createString(text);
+        for (String text : new String[]{"", "Trusted roots", "Grüße 世界 🔐"}) {
+            MemorySegment string = createString(text);
             try {
                 assertEquals(text, stringValue(string));
-                assertFalse(description(string).isEmpty() && !text.isEmpty());
+                assertFalse(getDescription(string).isEmpty() && !text.isEmpty());
             } finally {
                 release(string);
             }
@@ -39,14 +44,15 @@ public class CoreFoundationExtTest {
 
     @Test
     public void arraysRetainValuesAndCheckBounds() {
-        var string = createString("Certificate");
-        var array = createArray(string);
+        MemorySegment string = createString("Certificate");
+        MemorySegment array = createArray(string);
+        // the array retained the string (kCFTypeArrayCallBacks), so our reference can go
         release(string);
         try {
-            assertEquals(1, arrayCount(array));
-            assertEquals("Certificate", stringValue(arrayValue(array, 0)));
-            assertThrows(IndexOutOfBoundsException.class, () -> arrayValue(array, -1));
-            assertThrows(IndexOutOfBoundsException.class, () -> arrayValue(array, 1));
+            assertEquals(1, getArrayCount(array));
+            assertEquals("Certificate", stringValue(getValueAtIndex(array, 0)));
+            assertThrows(IndexOutOfBoundsException.class, () -> getValueAtIndex(array, -1));
+            assertThrows(IndexOutOfBoundsException.class, () -> getValueAtIndex(array, 1));
         } finally {
             release(array);
         }
@@ -54,13 +60,15 @@ public class CoreFoundationExtTest {
 
     @Test
     public void dictionariesCompareKeysByValue() {
-        var key = createString("A key that does not fit in a tagged pointer");
-        var equalKey = createString("A key that does not fit in a tagged pointer");
-        var dictionary = createDictionary(Map.of(key, TRUE));
+        // kCFTypeDictionaryKeyCallBacks compare keys with CFEqual, not by pointer:
+        // that is what makes the CFSTR-style kSecTrustSettings* keys created on our side match the framework's ones
+        MemorySegment key = createString("A key that does not fit in a tagged pointer");
+        MemorySegment equalKey = createString("A key that does not fit in a tagged pointer");
+        MemorySegment dictionary = createDictionary(Map.of(key, kCFBooleanTrue));
         release(key);
         try {
-            assertEquals(1, dictionaryCount(dictionary));
-            assertTrue(equal(TRUE, dictionaryValue(dictionary, equalKey)));
+            assertEquals(1, getDictionaryCount(dictionary));
+            assertTrue(equal(kCFBooleanTrue, getValue(dictionary, equalKey)));
         } finally {
             release(dictionary);
             release(equalKey);
@@ -69,10 +77,10 @@ public class CoreFoundationExtTest {
 
     @Test
     public void rejectsWrongObjectTypes() {
-        var string = createString("Not an array or a number");
+        MemorySegment string = createString("Not an array or a number");
         try {
-            assertThrows(ClassCastException.class, () -> arrayCount(string));
-            assertThrows(ClassCastException.class, () -> numberValue(string));
+            assertThrows(ClassCastException.class, () -> getArrayCount(string));
+            assertThrows(ClassCastException.class, () -> longValue(string));
         } finally {
             release(string);
         }
@@ -80,9 +88,9 @@ public class CoreFoundationExtTest {
 
     @Test
     public void readsSigned64BitNumbers() {
-        var number = number(-25300);
+        MemorySegment number = number(-25300);
         try {
-            assertEquals(-25300, numberValue(number));
+            assertEquals(-25300, longValue(number));
         } finally {
             release(number);
         }
@@ -90,16 +98,22 @@ public class CoreFoundationExtTest {
 
     @Test
     public void osStatusPreservesNegativeErrorCode() {
-        var error = SecurityFramework.error(SecurityFramework.ITEM_NOT_FOUND);
+        CoreFoundationExt.Error error = SecurityFramework.toError(SecurityFramework.errSecItemNotFound);
+        assertEquals(CoreFoundationExt.NSOSStatusErrorDomain, error.domain());
         assertEquals(-25300, error.code());
         assertFalse(error.description().isEmpty());
     }
 
+    /**
+     * {@code CFNumberCreate(NULL, kCFNumberSInt64Type, &value)}; the caller must release the result.
+     */
     static MemorySegment number(long value) {
-        var library = new NativeLibrary("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
-        var create = library.function("CFNumberCreate", of(ADDRESS, ADDRESS, JAVA_INT, ADDRESS));
-        try (var arena = Arena.ofConfined()) {
-            return requireNonNull((MemorySegment) create.invoke(NULL, 4, arena.allocateFrom(JAVA_LONG, value)));
+        NativeLibrary library = new NativeLibrary(CoreFoundationExt.CORE_FOUNDATION_LIBRARY_PATH);
+        var CFNumberCreate = library.downcall("CFNumberCreate", of(ADDRESS, ADDRESS, JAVA_INT, ADDRESS));
+        try (Arena arena = Arena.ofConfined()) {
+            return requireNonNull((MemorySegment) CFNumberCreate.invokeExact(NULL, kCFNumberSInt64Type, arena.allocateFrom(JAVA_LONG, value)));
+        } catch (Throwable e) {
+            throw new AssertionError(e);
         }
     }
 }
